@@ -39,3 +39,9 @@ coverage/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Upload folders (not needed with memory storage)
+uploads/
+temp/
+
+/src/generated/prisma

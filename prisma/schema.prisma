@@ -1,0 +1,158 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. Users Table
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  refreshTokens        RefreshToken[]
+  userBrandAccess      UserBrandAccess[]
+  userMarketplaceAccess UserMarketplaceAccess[]
+  userShippingAccess   UserShippingAccess[]
+  loginHistory         UserLoginHistory[]
+
+  @@map("users")
+}
+
+enum Role {
+  USER  @map("user")
+  ADMIN @map("admin")
+}
+
+// 2. Brands Table
+model Brand {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  userBrandAccess UserBrandAccess[]
+
+  @@map("brands")
+}
+
+// 3. Marketplaces Table
+model Marketplace {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  userMarketplaceAccess UserMarketplaceAccess[]
+
+  @@map("marketplaces")
+}
+
+// 4. Shipping Companies Table
+model ShippingCompany {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  userShippingAccess UserShippingAccess[]
+
+  @@map("shipping_companies")
+}
+
+// 5. Refresh Tokens Table
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  isRevoked Boolean  @default(false) @map("is_revoked")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// 6. User Brand Access Table
+model UserBrandAccess {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  brandId   Int      @map("brand_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, brandId])
+  @@map("user_brand_access")
+}
+
+// 7. User Marketplace Access Table
+model UserMarketplaceAccess {
+  id            Int         @id @default(autoincrement())
+  userId        Int         @map("user_id")
+  marketplaceId Int         @map("marketplace_id")
+  isActive      Boolean     @default(true) @map("is_active")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketplace Marketplace @relation(fields: [marketplaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, marketplaceId])
+  @@map("user_marketplace_access")
+}
+
+// 8. User Shipping Access Table
+model UserShippingAccess {
+  id                Int             @id @default(autoincrement())
+  userId            Int             @map("user_id")
+  shippingCompanyId Int             @map("shipping_company_id")
+  isActive          Boolean         @default(true) @map("is_active")
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  // Relations
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shippingCompany ShippingCompany @relation(fields: [shippingCompanyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shippingCompanyId])
+  @@map("user_shipping_access")
+}
+
+// 9. User Login History Table
+model UserLoginHistory {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("user_id")
+  loginTime       DateTime  @map("login_time")
+  logoutTime      DateTime? @map("logout_time")
+  sessionDuration Int?      @map("session_duration") // in minutes
+  ipAddress       String?   @map("ip_address")
+  networkType     String?   @map("network_type")
+  userAgent       String?   @map("user_agent")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_login_history")
+}
