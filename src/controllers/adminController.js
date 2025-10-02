@@ -41,20 +41,20 @@ class AdminController {
     }
   }
 
-  // API 3: Get users with brand access
-  static async getUsersWithBrandAccess(req, res) {
+  // API 3: Get users with complete access details (brands + marketplaces + shipping)
+  static async getUsersWithAllAccess(req, res) {
     try {
-      const users = await UserModel.getAllUsersWithBrandAccess();
+      const users = await UserModel.getAllUsersWithCompleteAccess();
 
       res.json({
-        message: 'Users with brand access retrieved successfully',
+        message: 'Users with complete access details retrieved successfully',
         count: users.length,
         users: users
       });
     } catch (error) {
-      console.error('Get users with brand access error:', error);
+      console.error('Get users with complete access error:', error);
       res.status(500).json({
-        error: 'Failed to retrieve users with brand access',
+        error: 'Failed to retrieve users with complete access',
         details: error.message
       });
     }

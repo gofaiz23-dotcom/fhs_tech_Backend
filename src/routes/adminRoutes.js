@@ -16,7 +16,7 @@ router.use(authenticateToken, requireAdmin);
 // Admin user management routes - 3 separate APIs
 router.get('/users/basic', AdminController.getUsersBasic);
 router.get('/users/history', AdminController.getUsersWithHistory);
-router.get('/users/brands', AdminController.getUsersWithBrandAccess);
+router.get('/users/access', AdminController.getUsersWithAllAccess);
 
 // Get specific user details
 router.get('/users/:id', validateId, AdminController.getUserById);

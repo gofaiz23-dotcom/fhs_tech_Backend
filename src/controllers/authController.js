@@ -8,7 +8,7 @@ class AuthController {
   // Register new user (First admin no token, then admin-only)
   static async register(req, res) {
     try {
-      const { email, password, role = 'USER' } = req.body;
+      const { username, email, password, role = 'USER' } = req.body;
 
       // Check if user already exists
       const existingUser = await UserModel.findByEmail(email);
@@ -54,6 +54,7 @@ class AuthController {
       // Create user - first user automatically becomes admin
       const finalRole = isFirstUser ? 'ADMIN' : role;
       const user = await UserModel.create({
+        username,
         email,
         passwordHash,
         role: finalRole
@@ -222,45 +223,28 @@ class AuthController {
     }
   }
 
-  // Get user profile
+  // Get user profile (basic details only)
   static async getProfile(req, res) {
     try {
       const userId = req.user.userId;
       
-      const user = await UserModel.findByIdWithAccess(userId);
+      const user = await UserModel.findById(userId);
       if (!user) {
         return res.status(404).json({
           error: 'User not found'
         });
       }
 
-      // Format user data
-      const userData = {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        brandAccess: user.userBrandAccess.filter(access => access.isActive).map(access => ({
-          id: access.brand.id,
-          name: access.brand.name,
-          description: access.brand.description
-        })),
-        marketplaceAccess: user.userMarketplaceAccess.filter(access => access.isActive).map(access => ({
-          id: access.marketplace.id,
-          name: access.marketplace.name,
-          description: access.marketplace.description
-        })),
-        shippingAccess: user.userShippingAccess.filter(access => access.isActive).map(access => ({
-          id: access.shippingCompany.id,
-          name: access.shippingCompany.name,
-          description: access.shippingCompany.description
-        }))
-      };
-
       res.json({
         message: 'Profile retrieved successfully',
-        user: userData
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt
+        }
       });
     } catch (error) {
       console.error('Get profile error:', error);

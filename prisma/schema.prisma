@@ -13,6 +13,7 @@ datasource db {
 // 1. Users Table
 model User {
   id           Int      @id @default(autoincrement())
+  username     String   
   email        String   @unique
   passwordHash String   @map("password_hash")
   role         Role     @default(USER)

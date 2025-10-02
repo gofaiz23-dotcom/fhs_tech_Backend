@@ -32,6 +32,7 @@ Admin-only endpoints for user management, including viewing all users, updating 
   "users": [
     {
       "id": 1,
+      "username": "john_doe",
       "email": "employee1@company.com",
       "role": "USER",
       "createdAt": "2024-01-15T10:00:00.000Z",
@@ -39,6 +40,7 @@ Admin-only endpoints for user management, including viewing all users, updating 
     },
     {
       "id": 2,
+      "username": "jane_doe",
       "email": "employee2@company.com",
       "role": "USER",
       "createdAt": "2024-01-16T10:00:00.000Z",
@@ -46,6 +48,7 @@ Admin-only endpoints for user management, including viewing all users, updating 
     },
     {
       "id": 3,
+      "username": "admin_user",
       "email": "admin@company.com",
       "role": "ADMIN",
       "createdAt": "2024-01-10T08:00:00.000Z",
@@ -140,11 +143,11 @@ curl -X GET http://192.168.0.23:5000/api/admin/users/history \
 
 ---
 
-### 3. Get Users with Brand Access
+### 3. Get All Users with Complete Access Details
 
-**Endpoint:** `GET /api/admin/users/brands`
+**Endpoint:** `GET /api/admin/users/access`
 
-**Description:** Get all users with their brand access permissions only
+**Description:** Get all users with their complete access details (brands, marketplaces, shipping, login history)
 
 **Headers:**
 ```json
@@ -156,87 +159,12 @@ curl -X GET http://192.168.0.23:5000/api/admin/users/history \
 **Response (Success - 200):**
 ```json
 {
-  "message": "Users with brand access retrieved successfully",
+  "message": "Users with complete access details retrieved successfully",
   "count": 2,
   "users": [
     {
       "id": 1,
-      "email": "employee1@company.com",
-      "role": "USER",
-      "createdAt": "2024-01-15T10:00:00.000Z",
-      "updatedAt": "2024-01-15T10:00:00.000Z",
-      
-      "brandAccess": [
-        {
-          "id": 1,
-          "name": "Nike",
-          "description": "Sports brand",
-          "isActive": true,
-          "grantedAt": "2024-01-16T10:00:00.000Z"
-        },
-        {
-          "id": 2,
-          "name": "Adidas",
-          "description": "Sports brand",
-          "isActive": false,
-          "grantedAt": "2024-01-17T10:00:00.000Z"
-        }
-      ],
-      
-      "brandSummary": {
-        "totalBrands": 1,
-        "totalGranted": 2,
-        "hasActiveBrands": true
-      }
-    },
-    {
-      "id": 2,
-      "email": "employee2@company.com",
-      "role": "USER",
-      "createdAt": "2024-01-16T10:00:00.000Z",
-      "updatedAt": "2024-01-16T10:00:00.000Z",
-      
-      "brandAccess": [],
-      
-      "brandSummary": {
-        "totalBrands": 0,
-        "totalGranted": 0,
-        "hasActiveBrands": false
-      }
-    }
-  ]
-}
-```
-
-**cURL Example:**
-```bash
-curl -X GET http://192.168.0.23:5000/api/admin/users/brands \
-  -H "Authorization: Bearer <admin_access_token>" \
-  -H "Content-Type: application/json"
-```
-
----
-
-### 4. Get Specific User Details
-
-**Endpoint:** `GET /api/admin/users/:id`
-
-**Description:** Get detailed information for a specific user by ID
-
-**Headers:**
-```json
-{
-  "Authorization": "Bearer <admin_access_token>"
-}
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "All users with complete access details retrieved successfully",
-  "users": [
-    {
-      "id": 1,
+      "username": "john_doe",
       "email": "employee1@company.com",
       "role": "USER",
       "createdAt": "2024-01-15T10:00:00.000Z",
@@ -262,31 +190,9 @@ curl -X GET http://192.168.0.23:5000/api/admin/users/brands \
           "sessionDuration": null,
           "ipAddress": "192.168.1.100",
           "networkType": "wifi",
-          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
           "isActive": true,
           "createdAt": "2024-01-20T14:30:00.000Z"
-        },
-        {
-          "id": 2,
-          "loginTime": "2024-01-19T09:15:00.000Z",
-          "logoutTime": "2024-01-19T17:45:00.000Z",
-          "sessionDuration": 510,
-          "ipAddress": "192.168.1.100",
-          "networkType": "wifi",
-          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "isActive": false,
-          "createdAt": "2024-01-19T09:15:00.000Z"
-        },
-        {
-          "id": 3,
-          "loginTime": "2024-01-18T08:00:00.000Z",
-          "logoutTime": "2024-01-18T16:30:00.000Z",
-          "sessionDuration": 510,
-          "ipAddress": "192.168.1.101",
-          "networkType": "4g",
-          "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
-          "isActive": false,
-          "createdAt": "2024-01-18T08:00:00.000Z"
         }
       ],
       
@@ -314,13 +220,6 @@ curl -X GET http://192.168.0.23:5000/api/admin/users/brands \
           "description": "E-commerce platform",
           "isActive": true,
           "grantedAt": "2024-01-16T10:00:00.000Z"
-        },
-        {
-          "id": 2,
-          "name": "Flipkart",
-          "description": "Indian e-commerce",
-          "isActive": true,
-          "grantedAt": "2024-01-17T10:00:00.000Z"
         }
       ],
       
@@ -336,25 +235,27 @@ curl -X GET http://192.168.0.23:5000/api/admin/users/brands \
       
       "accessSummary": {
         "totalBrands": 1,
-        "totalMarketplaces": 2,
+        "totalMarketplaces": 1,
         "totalShippingCompanies": 1,
         "hasAnyAccess": true
       }
     },
     {
       "id": 2,
-      "email": "admin@company.com",
-      "role": "ADMIN",
-      "createdAt": "2024-01-10T09:00:00.000Z",
-      "updatedAt": "2024-01-10T09:00:00.000Z",
+      "username": "jane_doe",
+      "email": "employee2@company.com",
+      "role": "USER",
+      "createdAt": "2024-01-16T10:00:00.000Z",
+      "updatedAt": "2024-01-16T10:00:00.000Z",
       
       "loginStats": {
-        "totalSessions": 50,
-        "totalLoginHours": 120.75,
-        "lastLogin": "2024-01-20T08:00:00.000Z",
+        "totalSessions": 0,
+        "totalLoginHours": 0,
+        "lastLogin": null,
         "currentSession": null
       },
       
+      "loginHistory": [],
       "brandAccess": [],
       "marketplaceAccess": [],
       "shippingAccess": [],
@@ -372,13 +273,14 @@ curl -X GET http://192.168.0.23:5000/api/admin/users/brands \
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/admin/users \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+curl -X GET http://192.168.0.23:5000/api/admin/users/access \
+  -H "Authorization: Bearer <admin_access_token>" \
+  -H "Content-Type: application/json"
 ```
 
 ---
 
-### 2. Get Specific User Details
+### 4. Get Specific User Details
 
 **Endpoint:** `GET /api/admin/users/:id`
 
@@ -400,6 +302,7 @@ curl -X GET http://192.168.0.23:5000/api/admin/users \
   "message": "User details retrieved successfully",
   "user": {
     "id": 1,
+    "username": "john_doe",
     "email": "user@example.com",
     "role": "USER",
     "createdAt": "2024-01-15T10:00:00.000Z",
@@ -498,6 +401,7 @@ curl -X GET http://192.168.0.23:5000/api/admin/users/1 \
   "message": "User email updated successfully",
   "user": {
     "id": 1,
+    "username": "john_doe",
     "email": "newemail@example.com",
     "role": "USER",
     "updatedAt": "2024-01-20T15:00:00.000Z"
@@ -554,6 +458,7 @@ curl -X PUT http://192.168.0.23:5000/api/admin/users/1/email \
   "message": "User password updated successfully",
   "user": {
     "id": 1,
+    "username": "john_doe",
     "email": "user@example.com",
     "role": "USER",
     "updatedAt": "2024-01-20T15:00:00.000Z"
@@ -603,6 +508,7 @@ curl -X PUT http://192.168.0.23:5000/api/admin/users/1/password \
   "message": "User role updated successfully",
   "user": {
     "id": 1,
+    "username": "john_doe",
     "email": "user@example.com",
     "role": "ADMIN",
     "updatedAt": "2024-01-20T15:00:00.000Z"

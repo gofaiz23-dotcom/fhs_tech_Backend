@@ -1,8 +1,55 @@
-# FHS Tech Backend - Complete API Documentation
+# FHS Tech Backend API Documentation
 
-## 📋 Overview
+This directory contains comprehensive documentation for all API endpoints in the FHS Tech Backend system.
 
-Welcome to the comprehensive API documentation for the FHS Tech Backend authentication and permission management system. This system provides a complete solution for user management, role-based access control, and detailed activity tracking.
+## 📋 System Overview
+
+This is a complete employee authentication and authorization system with:
+
+- **JWT-based Authentication** (Access + Refresh tokens)
+- **Role-based Access Control** (Admin/User roles)
+- **Granular Permissions** (Brand, Marketplace, Shipping access)
+- **Login History Tracking** (IP, Network type, Session duration)
+- **Bulk Data Import** (CSV/Excel file support)
+- **MVC Architecture** with Prisma ORM
+
+## 📁 Documentation Files
+
+### Core APIs
+1. **[Authentication APIs](01_Authentication_APIs.md)** - User registration, login, logout, profile
+2. **[Admin APIs](02_Admin_APIs.md)** - User management, role updates, access control
+
+### Resource Management APIs  
+3. **[Brands APIs](03_Brands_APIs.md)** - Brand CRUD operations
+4. **[Marketplaces APIs](04_Marketplaces_APIs.md)** - Marketplace CRUD operations
+5. **[Shipping APIs](05_Shipping_APIs.md)** - Shipping company CRUD operations
+
+### Permission & History APIs
+6. **[Permissions APIs](06_Permissions_APIs.md)** - User access management
+7. **[Login History APIs](07_Login_History_APIs.md)** - Session tracking
+
+## 🔑 Key Features
+
+### Authentication Flow
+- **First Admin Registration**: No token required for the very first admin user
+- **Subsequent Registrations**: Admin token required for all new user registrations  
+- **Access Token**: 15-minute lifetime, stored in memory/Zustand
+- **Refresh Token**: 1-day lifetime, HttpOnly cookie with rotation
+
+### User Management
+- **Username Field**: Added to all user records for better identification
+- **Role-based Access**: Admin (full access) vs User (limited access)
+- **Granular Permissions**: Toggle access to specific brands, marketplaces, shipping companies
+
+### Data Filtering
+- **User APIs**: Return only data user has access to
+- **Admin APIs**: Return all data regardless of permissions
+- **Access Control**: Automatic filtering based on user permissions
+
+### File Uploads
+- **Bulk Import**: CSV/Excel files processed from memory
+- **Supported Formats**: .csv, .xlsx, .xls files
+- **Memory Processing**: No temporary file storage required
 
 ## 🚀 Quick Start
 
@@ -11,257 +58,95 @@ Welcome to the comprehensive API documentation for the FHS Tech Backend authenti
 http://192.168.0.23:5000/api
 ```
 
-### Authentication
-All protected endpoints require a Bearer token in the Authorization header:
+### First Time Setup
+1. Register first admin (no token required):
+```bash
+curl -X POST http://192.168.0.23:5000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin_user",
+    "email": "admin@company.com", 
+    "password": "securepassword123",
+    "role": "ADMIN"
+  }'
 ```
-Authorization: Bearer <your_access_token>
+
+2. Login to get access token:
+```bash
+curl -X POST http://192.168.0.23:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@company.com",
+    "password": "securepassword123",
+    "networkType": "wifi"
+  }'
 ```
 
-## 📚 Documentation Structure
+3. Use the returned access token for subsequent API calls
 
-### 1. [Authentication APIs](./01_Authentication_APIs.md)
-Complete user authentication system with JWT tokens
-- User Registration (Admin only)
-- User Login with session tracking
-- Token Refresh mechanism
-- Secure Logout
-- User Profile management
+## 📊 Admin Dashboard APIs
 
-### 2. [Admin APIs](./02_Admin_APIs.md)
-Administrative functions for user management
-- View all users with statistics
-- Update user details (email, password, role)
-- Comprehensive user analytics
-- Login history monitoring
+For admin dashboards, use these comprehensive APIs:
 
-### 3. [Brands APIs](./03_Brands_APIs.md)
-Brand management with multiple creation methods
-- CRUD operations for brands
-- Single brand creation
-- Multiple brands creation
-- Bulk CSV/Excel file upload
-- Access control filtering
+- **`GET /api/admin/users/basic`** - Basic user details only
+- **`GET /api/admin/users/history`** - Users with login history
+- **`GET /api/admin/users/access`** - Users with complete access details (brands, marketplaces, shipping)
 
-### 4. [Marketplaces APIs](./04_Marketplaces_APIs.md)
-Marketplace management system
-- Complete marketplace CRUD
-- Bulk import capabilities
-- File upload support (CSV/Excel)
-- User access filtering
+## 🔒 Security Features
 
-### 5. [Shipping APIs](./05_Shipping_APIs.md)
-Shipping company management
-- Shipping company CRUD operations
-- Multiple creation methods
-- File upload processing
-- Access-based data filtering
+- **Password Hashing**: bcrypt with salt
+- **JWT Tokens**: Signed with secret key
+- **Refresh Token Rotation**: New token on each refresh
+- **Token Hashing**: Database stores hashed refresh tokens
+- **HttpOnly Cookies**: Secure refresh token storage
+- **CORS Configuration**: Development/production modes
+- **Permission Validation**: All endpoints validate user access
 
-### 6. [Permissions APIs](./06_Permissions_APIs.md)
-Granular permission management system
-- Brand access control
-- Marketplace permissions
-- Shipping company access
-- Toggle-based permission system
-- Audit trail maintenance
+## 🛠️ Environment Variables
 
-### 7. [Login History & Analytics](./07_Login_History_APIs.md)
-Comprehensive user activity tracking
-- Session monitoring
-- Work hour calculations
-- IP and network tracking
-- Productivity analytics
-- Security monitoring
-
-## 🔐 Security Features
-
-### JWT Token System
-- **Access Tokens:** 15-minute lifespan for API calls
-- **Refresh Tokens:** 7-day lifespan stored in HttpOnly cookies
-- **Automatic Refresh:** Seamless token renewal
-- **Secure Storage:** HttpOnly cookies prevent XSS attacks
-
-### Role-Based Access Control
-- **Admin Role:** Full system access and user management
-- **User Role:** Limited access based on granted permissions
-- **Permission Filtering:** Users only see authorized data
-
-### Activity Tracking
-- **Login/Logout Monitoring:** Complete session tracking
-- **IP Address Logging:** Network security monitoring
-- **Work Hour Calculation:** Productivity analytics
-- **Device Tracking:** Browser and device information
-
-## 📊 System Architecture
-
-### Database Tables (9 Total)
-1. **users** - User accounts and roles
-2. **brands** - Brand entities
-3. **marketplaces** - Marketplace entities
-4. **shipping_companies** - Shipping company entities
-5. **refresh_tokens** - JWT refresh token storage
-6. **user_brand_access** - Brand permissions
-7. **user_marketplace_access** - Marketplace permissions
-8. **user_shipping_access** - Shipping permissions
-9. **user_login_history** - Session tracking
-
-### API Endpoints (25 Total)
-- **5 Authentication APIs** - Login, logout, registration, profile
-- **5 Admin APIs** - User management and analytics
-- **5 Brand APIs** - Brand CRUD with bulk operations
-- **5 Marketplace APIs** - Marketplace management
-- **5 Shipping APIs** - Shipping company management
-- **9 Permission APIs** - Granular access control
-
-## 🛠️ Technical Specifications
-
-### Technology Stack
-- **Runtime:** Node.js with Express.js
-- **Database:** PostgreSQL with Prisma ORM
-- **Authentication:** JWT tokens with bcrypt hashing
-- **File Processing:** Direct memory processing (CSV/Excel)
-- **Security:** Helmet, CORS, Rate limiting
-
-### File Upload Support
-- **Formats:** CSV, Excel (.xlsx, .xls)
-- **Size Limit:** 10MB per file
-- **Processing:** Direct memory processing (no disk storage)
-- **Validation:** Real-time data validation and error reporting
-
-### Performance Features
-- **Memory Processing:** No temporary file storage
-- **Efficient Queries:** Optimized database operations
-- **Rate Limiting:** 100 requests per 15 minutes
-- **Connection Pooling:** Prisma connection management
-
-## 🎯 Use Cases
-
-### Employee Management
-- Create user accounts with specific permissions
-- Track work hours and productivity
-- Monitor login patterns and security
-- Manage access to different brands and marketplaces
-
-### E-commerce Operations
-- Control access to specific brands
-- Manage marketplace permissions
-- Restrict shipping company access
-- Bulk import brand/marketplace data
-
-### Security & Compliance
-- Complete audit trail of user activities
-- IP-based security monitoring
-- Session management and tracking
-- Role-based data access control
+```env
+DATABASE_URL="postgresql://username:password@localhost:5432/dbname"
+JWT_SECRET="your-super-secret-jwt-key-here"
+JWT_ACCESS_EXPIRES_IN="15m"
+JWT_REFRESH_EXPIRES_IN="1d"
+PORT=5000
+NODE_ENV="development"
+```
 
 ## 📱 Frontend Integration
 
-### Authentication Flow
+### Token Storage
+- **Access Token**: Store in Zustand with persistence
+- **Refresh Token**: Automatic HttpOnly cookie
+- **Auto-refresh**: Call `/api/auth/refresh` every 13 minutes
+
+### CORS Setup
 ```javascript
-// Login
-const response = await fetch('/api/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  credentials: 'include',
-  body: JSON.stringify({ email, password, networkType })
-});
-
-// API Calls
-const data = await fetch('/api/brands', {
-  headers: { 'Authorization': `Bearer ${accessToken}` },
-  credentials: 'include'
-});
-
-// Logout
-await fetch('/api/auth/logout', {
-  method: 'POST',
-  headers: { 'Authorization': `Bearer ${accessToken}` },
-  credentials: 'include'
-});
-```
-
-### File Upload
-```javascript
-const formData = new FormData();
-formData.append('file', csvFile);
-
-const response = await fetch('/api/brands', {
-  method: 'POST',
-  headers: { 'Authorization': `Bearer ${accessToken}` },
-  body: formData
-});
+// Development: All origins allowed
+// Production: Specific frontend URL only
+credentials: true // Required for cookies
 ```
 
 ## 🚨 Error Handling
 
-### Standard Error Codes
-- **400:** Bad Request - Invalid data or format
-- **401:** Unauthorized - Missing or invalid token
-- **403:** Forbidden - Insufficient permissions
-- **404:** Not Found - Resource doesn't exist
-- **500:** Internal Server Error - Server-side error
+All APIs return consistent error responses:
 
-### Error Response Format
 ```json
 {
   "error": "Error message",
-  "code": "ERROR_CODE",
-  "details": "Additional error information"
+  "details": ["Additional error details"]
 }
 ```
 
-## 📋 Getting Started Checklist
-
-### 1. Environment Setup
-- [ ] Install Node.js and npm
-- [ ] Set up PostgreSQL database
-- [ ] Configure environment variables
-- [ ] Run database migrations
-
-### 2. First Admin User
-- [ ] Create initial admin account
-- [ ] Test login functionality
-- [ ] Verify token generation
-
-### 3. Basic Configuration
-- [ ] Add brands, marketplaces, shipping companies
-- [ ] Create regular user accounts
-- [ ] Assign permissions to users
-- [ ] Test access control
-
-### 4. Integration Testing
-- [ ] Test all API endpoints
-- [ ] Verify file upload functionality
-- [ ] Check permission filtering
-- [ ] Monitor login history
-
-## 🔗 Additional Resources
-
-### API Testing
-- Use Postman or similar tools for API testing
-- Import the provided cURL examples
-- Test with both admin and user tokens
-
-### Database Management
-- Use Prisma Studio for database visualization
-- Monitor query performance
-- Regular backup procedures
-
-### Security Best Practices
-- Use strong JWT secrets in production
-- Enable HTTPS for all communications
-- Regular security audits
-- Monitor for suspicious activities
-
-## 📞 Support
-
-For technical support or questions about the API documentation:
-- Review the specific API documentation files
-- Check the error codes and responses
-- Verify authentication and permissions
-- Test with the provided examples
+Common HTTP status codes:
+- `200` - Success
+- `201` - Created
+- `400` - Validation Error
+- `401` - Authentication Required
+- `403` - Access Denied
+- `404` - Not Found
+- `500` - Server Error
 
 ---
 
-**Last Updated:** January 2024  
-**API Version:** 1.0.0  
-**Documentation Version:** 1.0.0
+**Note**: All timestamps are in ISO 8601 format (UTC). All APIs require proper authentication headers except for the first admin registration and login endpoints.

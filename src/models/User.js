@@ -7,6 +7,7 @@ class UserModel {
       data: userData,
       select: {
         id: true,
+        username: true,
         email: true,
         role: true,
         createdAt: true,
@@ -42,6 +43,7 @@ class UserModel {
       where: { id },
       select: {
         id: true,
+        username: true,
         email: true,
         role: true,
         createdAt: true,
@@ -55,6 +57,7 @@ class UserModel {
     return await prisma.user.findMany({
       select: {
         id: true,
+        username: true,
         email: true,
         role: true,
         createdAt: true,
@@ -148,6 +151,7 @@ class UserModel {
     return await prisma.user.findMany({
       select: {
         id: true,
+        username: true,
         email: true,
         role: true,
         createdAt: true,
@@ -162,6 +166,7 @@ class UserModel {
     const users = await prisma.user.findMany({
       select: {
         id: true,
+        username: true,
         email: true,
         role: true,
         createdAt: true,
@@ -187,6 +192,7 @@ class UserModel {
 
       return {
         id: user.id,
+        username: user.username,
         email: user.email,
         role: user.role,
         createdAt: user.createdAt,
@@ -224,6 +230,7 @@ class UserModel {
     const users = await prisma.user.findMany({
       select: {
         id: true,
+        username: true,
         email: true,
         role: true,
         createdAt: true,
@@ -245,6 +252,7 @@ class UserModel {
 
     return users.map(user => ({
       id: user.id,
+      username: user.username,
       email: user.email,
       role: user.role,
       createdAt: user.createdAt,
@@ -326,6 +334,7 @@ class UserModel {
 
       return {
         id: user.id,
+        username: user.username,
         email: user.email,
         role: user.role,
         createdAt: user.createdAt,

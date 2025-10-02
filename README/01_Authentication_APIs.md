@@ -33,6 +33,7 @@ Complete authentication system with JWT tokens, role-based access control, and l
 **Request Body:**
 ```json
 {
+  "username": "john_doe",
   "email": "user@example.com",
   "password": "password123",
   "role": "USER"
@@ -45,6 +46,7 @@ Complete authentication system with JWT tokens, role-based access control, and l
   "message": "First admin registered successfully",
   "user": {
     "id": 1,
+    "username": "admin_user",
     "email": "admin@company.com",
     "role": "ADMIN",
     "createdAt": "2024-01-15T10:00:00.000Z",
@@ -60,6 +62,7 @@ Complete authentication system with JWT tokens, role-based access control, and l
   "message": "User registered successfully",
   "user": {
     "id": 2,
+    "username": "john_doe",
     "email": "employee@company.com",
     "role": "USER",
     "createdAt": "2024-01-15T10:00:00.000Z",
@@ -82,6 +85,7 @@ curl -X POST http://192.168.0.23:5000/api/auth/register \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
+    "username": "newuser123",
     "email": "newuser@example.com",
     "password": "securepassword123",
     "role": "USER"
@@ -119,6 +123,7 @@ curl -X POST http://192.168.0.23:5000/api/auth/register \
   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImVtYWlsIjoidXNlckBleGFtcGxlLmNvbSIsInJvbGUiOiJVU0VSIiwiZXhwIjoxNjQwOTk1MjAwLCJpYXQiOjE2NDA5MDg4MDAsImp0aSI6IjEyMzQ1Njc4LTkwYWItY2RlZi0xMjM0LTU2Nzg5MGFiY2RlZiJ9.signature",
   "user": {
     "id": 1,
+    "username": "john_doe",
     "email": "user@example.com",
     "role": "USER"
   }
@@ -223,7 +228,7 @@ curl -X POST http://192.168.0.23:5000/api/auth/logout \
 
 **Endpoint:** `GET /api/auth/profile`
 
-**Description:** Get current user's profile and permissions
+**Description:** Get current user's basic profile information (without access permissions)
 
 **Headers:**
 ```json
@@ -238,34 +243,20 @@ curl -X POST http://192.168.0.23:5000/api/auth/logout \
   "message": "Profile retrieved successfully",
   "user": {
     "id": 1,
+    "username": "john_doe",
     "email": "user@example.com",
     "role": "USER",
     "createdAt": "2024-01-15T10:00:00.000Z",
-    "updatedAt": "2024-01-15T10:00:00.000Z",
-    "brandAccess": [
-      {
-        "id": 1,
-        "name": "Nike",
-        "description": "Sports brand"
-      }
-    ],
-    "marketplaceAccess": [
-      {
-        "id": 1,
-        "name": "Amazon",
-        "description": "E-commerce platform"
-      }
-    ],
-    "shippingAccess": [
-      {
-        "id": 1,
-        "name": "FedEx",
-        "description": "Courier service"
-      }
-    ]
+    "updatedAt": "2024-01-15T10:00:00.000Z"
   }
 }
 ```
+
+**Note:** For user access permissions, use the dedicated admin APIs:
+- `GET /api/admin/users/access` - All users with complete access details
+- `GET /api/users/:id/brands` - Specific user's brand access  
+- `GET /api/users/:id/marketplaces` - Specific user's marketplace access
+- `GET /api/users/:id/shipping` - Specific user's shipping access
 
 **cURL Example:**
 ```bash
@@ -284,7 +275,7 @@ curl -X GET http://192.168.0.23:5000/api/auth/profile \
 - **Format:** `Bearer <token>`
 
 ### Refresh Token
-- **Lifetime:** 7 days
+- **Lifetime:** 1 day (24 hours)
 - **Storage:** HttpOnly cookie (automatic)
 - **Usage:** Automatic refresh when access token expires
 - **Security:** Cannot be accessed by JavaScript
