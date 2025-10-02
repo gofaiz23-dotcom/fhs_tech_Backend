@@ -13,3 +13,8 @@ router.post('/logout', authenticateToken, AuthController.logout);
 router.get('/profile', authenticateToken, AuthController.getProfile);
 
 export default router;
+
+
+
+
+
