@@ -154,6 +154,10 @@ class AuthController {
   static async refresh(req, res) {
     try {
       const refreshToken = req.cookies.refreshToken;
+      
+      // Debug logging
+      console.log('🍪 Cookies received:', req.cookies);
+      console.log('🔑 Refresh token:', refreshToken ? 'Present' : 'Missing');
 
       if (!refreshToken) {
         return res.status(401).json({
