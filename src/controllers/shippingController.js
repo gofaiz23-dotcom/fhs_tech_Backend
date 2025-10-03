@@ -109,7 +109,21 @@ class ShippingController {
             description: company.description?.trim() || null
           }));
         } else if (name) {
-          // Single shipping company
+          // Single shipping company - check for duplicates
+          const existingShippingCompanies = await ShippingCompanyModel.findAll();
+          const existingNames = existingShippingCompanies.map(company => company.name.toLowerCase());
+          
+          if (existingNames.includes(name.toLowerCase())) {
+            return res.status(400).json({
+              error: 'Duplicate shipping company name',
+              message: 'Shipping company name already exists',
+              duplicate: {
+                name: name,
+                error: 'Shipping company name already exists'
+              }
+            });
+          }
+          
           shippingCompaniesToCreate = [{
             name: name.trim(),
             description: description?.trim() || null
@@ -131,26 +145,42 @@ class ShippingController {
         }
       }
 
-      // Create shipping companies one by one to handle duplicates
+      // Check for duplicates before creating
+      const existingShippingCompanies = await ShippingCompanyModel.findAll();
+      const existingNames = existingShippingCompanies.map(company => company.name.toLowerCase());
+      
+      // Separate unique and duplicate shipping companies
+      const uniqueShippingCompanies = [];
+      const duplicateShippingCompanies = [];
+      
       for (const companyData of shippingCompaniesToCreate) {
+        const companyName = companyData.name.toLowerCase();
+        if (existingNames.includes(companyName)) {
+          duplicateShippingCompanies.push({
+            name: companyData.name,
+            error: 'Shipping company name already exists'
+          });
+        } else {
+          uniqueShippingCompanies.push(companyData);
+          existingNames.push(companyName); // Add to list to prevent duplicates within the same batch
+        }
+      }
+      
+      // Create only unique shipping companies
+      for (const companyData of uniqueShippingCompanies) {
         try {
           const shippingCompany = await ShippingCompanyModel.create(companyData);
           results.created.push(shippingCompany);
         } catch (error) {
-          if (error.code === 'P2002') {
-            // Duplicate entry
-            results.duplicates.push({
-              name: companyData.name,
-              error: 'Shipping company name already exists'
-            });
-          } else {
-            results.errors.push({
-              name: companyData.name,
-              error: error.message
-            });
-          }
+          results.errors.push({
+            name: companyData.name,
+            error: error.message
+          });
         }
       }
+      
+      // Add duplicates to results
+      results.duplicates = duplicateShippingCompanies;
 
       // Prepare response
       const response = {

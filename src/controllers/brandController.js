@@ -109,7 +109,21 @@ class BrandController {
             description: brand.description?.trim() || null
           }));
         } else if (name) {
-          // Single brand
+          // Single brand - check for duplicates
+          const existingBrands = await BrandModel.findAll();
+          const existingNames = existingBrands.map(brand => brand.name.toLowerCase());
+          
+          if (existingNames.includes(name.toLowerCase())) {
+            return res.status(400).json({
+              error: 'Duplicate brand name',
+              message: 'Brand name already exists',
+              duplicate: {
+                name: name,
+                error: 'Brand name already exists'
+              }
+            });
+          }
+          
           brandsToCreate = [{
             name: name.trim(),
             description: description?.trim() || null
@@ -131,26 +145,42 @@ class BrandController {
         }
       }
 
-      // Create brands one by one to handle duplicates
+      // Check for duplicates before creating
+      const existingBrands = await BrandModel.findAll();
+      const existingNames = existingBrands.map(brand => brand.name.toLowerCase());
+      
+      // Separate unique and duplicate brands
+      const uniqueBrands = [];
+      const duplicateBrands = [];
+      
       for (const brandData of brandsToCreate) {
+        const brandName = brandData.name.toLowerCase();
+        if (existingNames.includes(brandName)) {
+          duplicateBrands.push({
+            name: brandData.name,
+            error: 'Brand name already exists'
+          });
+        } else {
+          uniqueBrands.push(brandData);
+          existingNames.push(brandName); // Add to list to prevent duplicates within the same batch
+        }
+      }
+      
+      // Create only unique brands
+      for (const brandData of uniqueBrands) {
         try {
           const brand = await BrandModel.create(brandData);
           results.created.push(brand);
         } catch (error) {
-          if (error.code === 'P2002') {
-            // Duplicate entry
-            results.duplicates.push({
-              name: brandData.name,
-              error: 'Brand name already exists'
-            });
-          } else {
-            results.errors.push({
-              name: brandData.name,
-              error: error.message
-            });
-          }
+          results.errors.push({
+            name: brandData.name,
+            error: error.message
+          });
         }
       }
+      
+      // Add duplicates to results
+      results.duplicates = duplicateBrands;
 
       // Prepare response
       const response = {

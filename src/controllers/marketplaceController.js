@@ -109,7 +109,21 @@ class MarketplaceController {
             description: marketplace.description?.trim() || null
           }));
         } else if (name) {
-          // Single marketplace
+          // Single marketplace - check for duplicates
+          const existingMarketplaces = await MarketplaceModel.findAll();
+          const existingNames = existingMarketplaces.map(marketplace => marketplace.name.toLowerCase());
+          
+          if (existingNames.includes(name.toLowerCase())) {
+            return res.status(400).json({
+              error: 'Duplicate marketplace name',
+              message: 'Marketplace name already exists',
+              duplicate: {
+                name: name,
+                error: 'Marketplace name already exists'
+              }
+            });
+          }
+          
           marketplacesToCreate = [{
             name: name.trim(),
             description: description?.trim() || null
@@ -131,26 +145,42 @@ class MarketplaceController {
         }
       }
 
-      // Create marketplaces one by one to handle duplicates
+      // Check for duplicates before creating
+      const existingMarketplaces = await MarketplaceModel.findAll();
+      const existingNames = existingMarketplaces.map(marketplace => marketplace.name.toLowerCase());
+      
+      // Separate unique and duplicate marketplaces
+      const uniqueMarketplaces = [];
+      const duplicateMarketplaces = [];
+      
       for (const marketplaceData of marketplacesToCreate) {
+        const marketplaceName = marketplaceData.name.toLowerCase();
+        if (existingNames.includes(marketplaceName)) {
+          duplicateMarketplaces.push({
+            name: marketplaceData.name,
+            error: 'Marketplace name already exists'
+          });
+        } else {
+          uniqueMarketplaces.push(marketplaceData);
+          existingNames.push(marketplaceName); // Add to list to prevent duplicates within the same batch
+        }
+      }
+      
+      // Create only unique marketplaces
+      for (const marketplaceData of uniqueMarketplaces) {
         try {
           const marketplace = await MarketplaceModel.create(marketplaceData);
           results.created.push(marketplace);
         } catch (error) {
-          if (error.code === 'P2002') {
-            // Duplicate entry
-            results.duplicates.push({
-              name: marketplaceData.name,
-              error: 'Marketplace name already exists'
-            });
-          } else {
-            results.errors.push({
-              name: marketplaceData.name,
-              error: error.message
-            });
-          }
+          results.errors.push({
+            name: marketplaceData.name,
+            error: error.message
+          });
         }
       }
+      
+      // Add duplicates to results
+      results.duplicates = duplicateMarketplaces;
 
       // Prepare response
       const response = {
