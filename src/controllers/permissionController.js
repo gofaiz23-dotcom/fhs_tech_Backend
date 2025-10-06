@@ -3,6 +3,7 @@ import BrandModel from '../models/Brand.js';
 import MarketplaceModel from '../models/Marketplace.js';
 import ShippingCompanyModel from '../models/ShippingCompany.js';
 import UserModel from '../models/User.js';
+import ManagementLogger from '../utils/managementLogger.js';
 
 class PermissionController {
   // Brand Access Methods
@@ -62,6 +63,17 @@ class PermissionController {
 
       const access = await UserAccessModel.createBrandAccess(userId, brandId);
 
+      // Log the permission action
+      await ManagementLogger.logPermissionAction(
+        req.user.userId,
+        'GRANT',
+        userId,
+        'BRAND',
+        brandId,
+        { brandName: brand.name, action: 'Brand access granted' },
+        req
+      );
+
       res.status(201).json({
         message: 'Brand access granted successfully',
         access: {
@@ -102,6 +114,21 @@ class PermissionController {
       }
 
       const access = await UserAccessModel.toggleBrandAccess(userId, brandId);
+
+      // Log the permission action
+      await ManagementLogger.logPermissionAction(
+        req.user.userId,
+        'TOGGLE',
+        userId,
+        'BRAND',
+        brandId,
+        { 
+          brandName: brand.name, 
+          action: `Brand access ${access.isActive ? 'enabled' : 'disabled'}`,
+          newStatus: access.isActive 
+        },
+        req
+      );
 
       res.json({
         message: `Brand access ${access.isActive ? 'enabled' : 'disabled'} successfully`,
@@ -178,6 +205,17 @@ class PermissionController {
 
       const access = await UserAccessModel.createMarketplaceAccess(userId, marketplaceId);
 
+      // Log the permission action
+      await ManagementLogger.logPermissionAction(
+        req.user.userId,
+        'GRANT',
+        userId,
+        'MARKETPLACE',
+        marketplaceId,
+        { marketplaceName: marketplace.name, action: 'Marketplace access granted' },
+        req
+      );
+
       res.status(201).json({
         message: 'Marketplace access granted successfully',
         access: {
@@ -218,6 +256,21 @@ class PermissionController {
       }
 
       const access = await UserAccessModel.toggleMarketplaceAccess(userId, marketplaceId);
+
+      // Log the permission action
+      await ManagementLogger.logPermissionAction(
+        req.user.userId,
+        'TOGGLE',
+        userId,
+        'MARKETPLACE',
+        marketplaceId,
+        { 
+          marketplaceName: marketplace.name, 
+          action: `Marketplace access ${access.isActive ? 'enabled' : 'disabled'}`,
+          newStatus: access.isActive 
+        },
+        req
+      );
 
       res.json({
         message: `Marketplace access ${access.isActive ? 'enabled' : 'disabled'} successfully`,
@@ -294,6 +347,17 @@ class PermissionController {
 
       const access = await UserAccessModel.createShippingAccess(userId, shippingCompanyId);
 
+      // Log the permission action
+      await ManagementLogger.logPermissionAction(
+        req.user.userId,
+        'GRANT',
+        userId,
+        'SHIPPING',
+        shippingCompanyId,
+        { shippingCompanyName: shippingCompany.name, action: 'Shipping access granted' },
+        req
+      );
+
       res.status(201).json({
         message: 'Shipping access granted successfully',
         access: {
@@ -334,6 +398,21 @@ class PermissionController {
       }
 
       const access = await UserAccessModel.toggleShippingAccess(userId, shippingId);
+
+      // Log the permission action
+      await ManagementLogger.logPermissionAction(
+        req.user.userId,
+        'TOGGLE',
+        userId,
+        'SHIPPING',
+        shippingId,
+        { 
+          shippingCompanyName: shippingCompany.name, 
+          action: `Shipping access ${access.isActive ? 'enabled' : 'disabled'}`,
+          newStatus: access.isActive 
+        },
+        req
+      );
 
       res.json({
         message: `Shipping access ${access.isActive ? 'enabled' : 'disabled'} successfully`,

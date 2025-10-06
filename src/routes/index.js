@@ -6,6 +6,7 @@ import marketplaceRoutes from './marketplaceRoutes.js';
 import shippingRoutes from './shippingRoutes.js';
 import permissionRoutes from './permissionRoutes.js';
 import managementHistoryRoutes from './managementHistoryRoutes.js';
+import userActivityRoutes from './userActivityRoutes.js';
 
 const router = express.Router();
 
@@ -17,6 +18,7 @@ router.use('/marketplaces', marketplaceRoutes);
 router.use('/shipping', shippingRoutes);
 router.use('/users', permissionRoutes);
 router.use('/management', managementHistoryRoutes);
+router.use('/activities', userActivityRoutes);
 
 // Health check route
 router.get('/health', (req, res) => {
@@ -40,6 +42,7 @@ router.get('/', (req, res) => {
       shipping: '/api/shipping',
       permissions: '/api/users',
       management: '/api/management',
+      activities: '/api/activities',
       health: '/api/health'
     }
   });

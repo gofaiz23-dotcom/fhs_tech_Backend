@@ -324,6 +324,56 @@ class ManagementHistoryModel {
     };
   }
 
+  // Get User Activity History
+  static async getUserActivityHistory(whereClause) {
+    return await prisma.productManagementHistory.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            role: true
+          }
+        },
+        brand: {
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  // Get All User Activities (Admin)
+  static async getAllUserActivities(whereClause) {
+    return await prisma.productManagementHistory.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            role: true
+          }
+        },
+        brand: {
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
   // Get Management History Summary
   static async getManagementHistorySummary() {
     const [userCount, brandCount, marketplaceCount, shippingCount, permissionCount] = await Promise.all([

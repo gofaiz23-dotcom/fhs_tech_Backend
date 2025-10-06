@@ -161,6 +161,19 @@ class UserModel {
     });
   }
 
+  // Check if user has access to a brand
+  static async checkBrandAccess(userId, brandId) {
+    const access = await prisma.userBrandAccess.findUnique({
+      where: {
+        userId_brandId: {
+          userId: userId,
+          brandId: brandId
+        }
+      }
+    });
+    return access && access.isActive;
+  }
+
   // Get user with detailed access
   static async findByIdWithAccess(id) {
     return await prisma.user.findUnique({
