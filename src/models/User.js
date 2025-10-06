@@ -37,6 +37,21 @@ class UserModel {
     });
   }
 
+  // Find user by username
+  static async findByUsername(username) {
+    return await prisma.user.findUnique({
+      where: { username },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+  }
+
   // Find user by ID
   static async findById(id) {
     return await prisma.user.findUnique({
@@ -89,6 +104,21 @@ class UserModel {
       data: { email },
       select: {
         id: true,
+        email: true,
+        role: true,
+        updatedAt: true
+      }
+    });
+  }
+
+  // Update user username
+  static async updateUsername(id, username) {
+    return await prisma.user.update({
+      where: { id },
+      data: { username },
+      select: {
+        id: true,
+        username: true,
         email: true,
         role: true,
         updatedAt: true

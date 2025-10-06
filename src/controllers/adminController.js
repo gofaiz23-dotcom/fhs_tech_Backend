@@ -172,6 +172,44 @@ class AdminController {
     }
   }
 
+  // Update user username
+  static async updateUserUsername(req, res) {
+    try {
+      const userId = parseInt(req.params.id);
+      const { username } = req.body;
+
+      // Check if user exists
+      const existingUser = await UserModel.findById(userId);
+      if (!existingUser) {
+        return res.status(404).json({
+          error: 'User not found'
+        });
+      }
+
+      // Check if username is already taken by another user
+      const usernameExists = await UserModel.findByUsername(username);
+      if (usernameExists && usernameExists.id !== userId) {
+        return res.status(400).json({
+          error: 'Username is already taken by another user'
+        });
+      }
+
+      // Update username
+      const updatedUser = await UserModel.updateUsername(userId, username);
+
+      res.json({
+        message: 'User username updated successfully',
+        user: updatedUser
+      });
+    } catch (error) {
+      console.error('Update user username error:', error);
+      res.status(500).json({
+        error: 'Failed to update user username',
+        details: error.message
+      });
+    }
+  }
+
   // Update user password
   static async updateUserPassword(req, res) {
     try {

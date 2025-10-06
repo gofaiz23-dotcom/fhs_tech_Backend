@@ -70,6 +70,15 @@ export const validateRoleUpdate = [
   handleValidationErrors
 ];
 
+export const validateUsernameUpdate = [
+  body('username')
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Username must be between 2 and 50 characters')
+    .matches(/^[a-zA-Z0-9_-]+$/)
+    .withMessage('Username can only contain letters, numbers, underscores, and hyphens'),
+  handleValidationErrors
+];
+
 // Brand validation rules
 export const validateBrand = [
   body('name')

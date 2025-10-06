@@ -5,7 +5,8 @@ import {
   validateId, 
   validateEmailUpdate, 
   validatePasswordUpdate, 
-  validateRoleUpdate 
+  validateRoleUpdate,
+  validateUsernameUpdate 
 } from '../middlewares/validation.js';
 
 const router = express.Router();
@@ -21,6 +22,7 @@ router.get('/users/access', AdminController.getUsersWithAllAccess);
 // Get specific user details
 router.get('/users/:id', validateId, AdminController.getUserById);
 router.put('/users/:id/email', validateId, validateEmailUpdate, AdminController.updateUserEmail);
+router.put('/users/:id/username', validateId, validateUsernameUpdate, AdminController.updateUserUsername);
 router.put('/users/:id/password', validateId, validatePasswordUpdate, AdminController.updateUserPassword);
 router.put('/users/:id/role', validateId, validateRoleUpdate, AdminController.updateUserRole);
 
