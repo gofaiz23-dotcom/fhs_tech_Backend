@@ -279,6 +279,42 @@ class AdminController {
       });
     }
   }
+
+  // Delete user
+  static async deleteUser(req, res) {
+    try {
+      const userId = parseInt(req.params.id);
+
+      // Check if user exists
+      const existingUser = await UserModel.findById(userId);
+      if (!existingUser) {
+        return res.status(404).json({
+          error: 'User not found'
+        });
+      }
+
+      // Prevent admin from deleting themselves
+      if (userId === req.user.userId) {
+        return res.status(400).json({
+          error: 'Cannot delete your own account'
+        });
+      }
+
+      // Delete user (this will cascade delete related records)
+      await UserModel.delete(userId);
+
+      res.json({
+        message: 'User deleted successfully',
+        deletedUserId: userId
+      });
+    } catch (error) {
+      console.error('Delete user error:', error);
+      res.status(500).json({
+        error: 'Failed to delete user',
+        details: error.message
+      });
+    }
+  }
 }
 
 export default AdminController;

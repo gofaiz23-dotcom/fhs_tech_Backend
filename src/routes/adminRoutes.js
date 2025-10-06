@@ -25,5 +25,6 @@ router.put('/users/:id/email', validateId, validateEmailUpdate, AdminController.
 router.put('/users/:id/username', validateId, validateUsernameUpdate, AdminController.updateUserUsername);
 router.put('/users/:id/password', validateId, validatePasswordUpdate, AdminController.updateUserPassword);
 router.put('/users/:id/role', validateId, validateRoleUpdate, AdminController.updateUserRole);
+router.delete('/users/:id/delete', validateId, AdminController.deleteUser);
 
 export default router;

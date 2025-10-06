@@ -154,6 +154,13 @@ class UserModel {
     });
   }
 
+  // Delete user
+  static async delete(id) {
+    return await prisma.user.delete({
+      where: { id }
+    });
+  }
+
   // Get user with detailed access
   static async findByIdWithAccess(id) {
     return await prisma.user.findUnique({
