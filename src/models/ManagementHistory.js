@@ -320,6 +320,23 @@ class ManagementHistoryModel {
         ipAddress: history.ipAddress,
         userAgent: history.userAgent,
         createdAt: history.createdAt
+      })),
+      userActivities: productHistory.map(history => ({
+        id: history.id,
+        type: 'USER_ACTIVITY',
+        action: history.action,
+        user: {
+          id: history.userId,
+          username: history.user?.username,
+          email: history.user?.email,
+          role: history.user?.role
+        },
+        brand: history.brand,
+        productId: history.productId,
+        details: history.details,
+        ipAddress: history.ipAddress,
+        userAgent: history.userAgent,
+        createdAt: history.createdAt
       }))
     };
   }

@@ -11,7 +11,9 @@ class ManagementHistoryController {
         ...history.userManagement,
         ...history.brandManagement,
         ...history.marketplaceManagement,
-        ...history.shippingManagement
+        ...history.shippingManagement,
+        ...history.permissionManagement,
+        ...history.userActivities
       ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
       res.json({
@@ -21,6 +23,8 @@ class ManagementHistoryController {
           totalBrandActions: history.brandManagement.length,
           totalMarketplaceActions: history.marketplaceManagement.length,
           totalShippingActions: history.shippingManagement.length,
+          totalPermissionActions: history.permissionManagement.length,
+          totalUserActivities: history.userActivities.length,
           totalActions: allHistory.length
         },
         history: allHistory
