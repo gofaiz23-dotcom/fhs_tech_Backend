@@ -23,13 +23,7 @@ class ManagementHistoryController {
           totalShippingActions: history.shippingManagement.length,
           totalActions: allHistory.length
         },
-        history: allHistory,
-        categorizedHistory: {
-          userManagement: history.userManagement,
-          brandManagement: history.brandManagement,
-          marketplaceManagement: history.marketplaceManagement,
-          shippingManagement: history.shippingManagement
-        }
+        history: allHistory
       });
     } catch (error) {
       console.error('Get management history error:', error);
@@ -58,6 +52,7 @@ class ManagementHistoryController {
       });
     }
   }
+
 }
 
 export default ManagementHistoryController;
