@@ -39,7 +39,7 @@ class UserModel {
 
   // Find user by username
   static async findByUsername(username) {
-    return await prisma.user.findUnique({
+    return await prisma.user.findFirst({
       where: { username },
       select: {
         id: true,
