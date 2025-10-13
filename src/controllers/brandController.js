@@ -77,6 +77,13 @@ class BrandController {
 
       // Check if file was uploaded
       if (req.file) {
+        console.log('📁 Brand File Upload:', {
+          filename: req.file.originalname,
+          storedFilename: req.file.filename,
+          path: req.file.path,
+          size: req.file.size
+        });
+
         // Process file upload from memory buffer
         const FileProcessor = (await import('../utils/fileProcessor.js')).default;
         const fileData = await FileProcessor.processFileBuffer(req.file.buffer, req.file.originalname);
@@ -193,6 +200,17 @@ class BrandController {
         },
         results: results
       };
+
+      // Add file information if file was uploaded
+      if (req.file) {
+        response.fileInfo = {
+          originalName: req.file.originalname,
+          storedName: req.file.filename,
+          path: req.file.path,
+          size: req.file.size,
+          mimetype: req.file.mimetype
+        };
+      }
 
       // Determine status code
       if (results.created.length === 0) {

@@ -160,6 +160,87 @@ class FileProcessor {
     
     return { validData, errors };
   }
+
+  // Validate product data
+  static validateProductData(data) {
+    const validData = [];
+    const errors = [];
+    
+    data.forEach((item, index) => {
+      const row = index + 1;
+      
+      // Required fields validation
+      if (!item.title || item.title.trim() === '') {
+        errors.push(`Row ${row}: Product title is required`);
+        return;
+      }
+      
+      if (!item.groupSku || item.groupSku.trim() === '') {
+        errors.push(`Row ${row}: Group SKU is required`);
+        return;
+      }
+      
+      if (!item.subSku || item.subSku.trim() === '') {
+        errors.push(`Row ${row}: Sub SKU is required`);
+        return;
+      }
+      
+      if (!item.brandId && !item.brandName) {
+        errors.push(`Row ${row}: Brand ID or Brand Name is required`);
+        return;
+      }
+
+      // Brand Real Price is mandatory
+      if (item.brandRealPrice === undefined || item.brandRealPrice === null || item.brandRealPrice === '') {
+        errors.push(`Row ${row}: Brand Real Price is mandatory`);
+        return;
+      }
+      
+      // Extract attributes (all fields except the main product fields and pricing fields)
+      const attributes = {};
+      const pricingFields = ['brandRealPrice', 'brandMiscellaneous', 'shippingPrice', 'commissionPrice', 'profitMarginPrice', 'ecommerceMiscellaneous'];
+      const mainFields = ['title', 'groupSku', 'subSku', 'brandId', 'brandName', 'category', 'collections', 'shipTypes', 'singleSetItem'];
+      
+      Object.keys(item).forEach(key => {
+        if (!mainFields.includes(key) && !pricingFields.includes(key)) {
+          // Handle image fields specially
+          if (key === 'mainImageUrl' || key === 'galleryImages') {
+            if (key === 'galleryImages' && typeof item[key] === 'string') {
+              // If galleryImages is a string (comma-separated URLs), convert to array
+              attributes[key] = item[key].split(',').map(url => url.trim()).filter(url => url);
+            } else {
+              attributes[key] = item[key];
+            }
+          } else {
+            attributes[key] = item[key];
+          }
+        }
+      });
+      
+      validData.push({
+        brandId: item.brandId,
+        brandName: item.brandName,
+        title: item.title.trim(),
+        groupSku: item.groupSku.trim(),
+        subSku: item.subSku.trim(),
+        category: item.category ? item.category.trim() : '',
+        collections: item.collections ? item.collections.trim() : '',
+        shipTypes: item.shipTypes ? item.shipTypes.trim() : '',
+        singleSetItem: item.singleSetItem ? item.singleSetItem.trim() : '',
+        // Brand Pricing (brandRealPrice is mandatory, others default to 0)
+        brandRealPrice: parseFloat(item.brandRealPrice),
+        brandMiscellaneous: parseFloat(item.brandMiscellaneous) || 0,
+        // Ecommerce Pricing (All default to 0 - will be set via separate API)
+        shippingPrice: 0,
+        commissionPrice: 0,
+        profitMarginPrice: 0,
+        ecommerceMiscellaneous: 0,
+        attributes: attributes
+      });
+    });
+    
+    return { validData, errors };
+  }
 }
 
 export default FileProcessor;

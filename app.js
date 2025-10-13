@@ -28,6 +28,9 @@ app.use(cors({
   exposedHeaders: ['Set-Cookie']
 }));
 
+// Serve static files (images)
+app.use('/uploads/images', express.static('uploads/images'));
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

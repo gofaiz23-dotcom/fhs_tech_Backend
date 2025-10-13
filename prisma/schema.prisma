@@ -57,6 +57,7 @@ model Brand {
   userBrandAccess UserBrandAccess[]
   managementHistory BrandManagementHistory[]
   productActions ProductManagementHistory[] @relation("BrandProductActions")
+  products Product[]
 
   @@map("brands")
 }
@@ -276,6 +277,43 @@ model ProductManagementHistory {
   // Relations
   user        User     @relation("UserProductActions", fields: [userId], references: [id], onDelete: Cascade)
   brand       Brand    @relation("BrandProductActions", fields: [brandId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@map("product_management_history")
+}
+
+// 10. Products Table
+model Product {
+  id          Int      @id @default(autoincrement())
+  brandId     Int      @map("brand_id")
+  title       String
+  groupSku    String   @map("group_sku")
+  subSku      String   @map("sub_sku")
+  category    String
+  collections String
+  shipTypes   String   @map("ship_types")
+  singleSetItem String @map("single_set_item")
+  
+  
+  // Brand Pricing Columns (Mandatory)
+  brandRealPrice      Decimal @map("brand_real_price") @db.Decimal(10,2)
+  brandMiscellaneous  Decimal @map("brand_miscellaneous") @db.Decimal(10,2)
+  brandPrice          Decimal @map("brand_price") @db.Decimal(10,2)
+  
+  // Ecommerce Pricing Columns (Mandatory)
+  shippingPrice       Decimal @map("shipping_price") @db.Decimal(10,2)
+  commissionPrice     Decimal @map("commission_price") @db.Decimal(10,2)
+  profitMarginPrice   Decimal @map("profit_margin_price") @db.Decimal(10,2)
+  ecommerceMiscellaneous Decimal @map("ecommerce_miscellaneous") @db.Decimal(10,2)
+  ecommercePrice      Decimal @map("ecommerce_price") @db.Decimal(10,2)
+  
+  attributes  Json     // All extra data in JSONB format
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  productHistory ProductManagementHistory[]
+
+  @@map("products")
 }

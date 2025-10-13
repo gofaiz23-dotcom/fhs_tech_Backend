@@ -123,6 +123,30 @@ class ManagementHistoryModel {
     });
   }
 
+  // Product Management History
+  static async createProductHistory(historyData) {
+    return await prisma.productManagementHistory.create({
+      data: historyData,
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            role: true
+          }
+        },
+        brand: {
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
+        }
+      }
+    });
+  }
+
   // Product Management History (Future)
   static async createProductHistory(historyData) {
     return await prisma.productManagementHistory.create({

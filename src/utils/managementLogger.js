@@ -93,6 +93,25 @@ class ManagementLogger {
     }
   }
 
+  // Log Product Management Actions
+  static async logProductAction(userId, action, productId, brandId, details = null, req = null) {
+    try {
+      const logData = {
+        userId,
+        productId,
+        brandId,
+        action, // CREATE, UPDATE, DELETE, DELETE_ALL, UPDATE_PRICING, UPDATE_IMAGES
+        details,
+        ipAddress: req?.ip || null,
+        userAgent: req?.get('User-Agent') || null
+      };
+
+      await ManagementHistoryModel.createProductHistory(logData);
+    } catch (error) {
+      console.error('Failed to log product management action:', error);
+    }
+  }
+
   // Helper method to create details object
   static createDetailsObject(oldData = null, newData = null, additionalInfo = {}) {
     return {
