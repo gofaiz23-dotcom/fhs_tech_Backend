@@ -100,6 +100,46 @@ const upload = multer({
   }
 });
 
+// Configure multer for disk storage with memory buffer (hybrid approach)
+const hybridStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const fileExtension = path.extname(file.originalname);
+    const fileName = file.fieldname + '-' + uniqueSuffix + fileExtension;
+    cb(null, fileName);
+  }
+});
+
+// Hybrid upload that stores to disk AND provides memory buffer
+const hybridUpload = multer({
+  storage: hybridStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
+// Custom middleware to add memory buffer to disk storage
+const addMemoryBuffer = (req, res, next) => {
+  if (req.file) {
+    // Read the file from disk into memory buffer
+    fs.readFile(req.file.path, (err, data) => {
+      if (err) {
+        console.error('Error reading file to buffer:', err);
+        return next(err);
+      }
+      req.file.buffer = data;
+      next();
+    });
+  } else {
+    next();
+  }
+};
+
 // Configure multer for memory storage (for processing)
 const memoryUpload = multer({
   storage: memoryStorage,
@@ -120,6 +160,9 @@ const imageUpload = multer({
 
 // Single file upload middleware (stores to disk + provides buffer)
 export const uploadSingle = upload.single('file');
+
+// Hybrid upload middleware (stores to disk AND provides memory buffer)
+export const uploadSingleHybrid = [hybridUpload.single('file'), addMemoryBuffer];
 
 // Memory upload middleware (for processing only)
 export const uploadMemory = memoryUpload.single('file');

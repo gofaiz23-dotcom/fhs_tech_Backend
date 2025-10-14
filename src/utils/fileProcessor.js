@@ -102,9 +102,25 @@ class FileProcessor {
   // Process Excel file from buffer (.xlsx, .xls)
   static async processExcelBuffer(buffer) {
     try {
+      // Validate buffer
+      if (!buffer || buffer.length === 0) {
+        throw new Error('Excel file buffer is empty or invalid');
+      }
+
       const workbook = XLSX.read(buffer, { type: 'buffer' });
+      
+      // Check if workbook has any sheets
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        throw new Error('Excel file contains no worksheets');
+      }
+      
       const sheetName = workbook.SheetNames[0]; // Get first sheet
       const worksheet = workbook.Sheets[sheetName];
+      
+      // Check if worksheet exists
+      if (!worksheet) {
+        throw new Error(`Worksheet "${sheetName}" not found in Excel file`);
+      }
       
       // Convert to JSON
       const data = XLSX.utils.sheet_to_json(worksheet, {
@@ -112,8 +128,18 @@ class FileProcessor {
         defval: '' // Default value for empty cells
       });
       
+      // Validate data structure
+      if (!data || !Array.isArray(data)) {
+        throw new Error('Failed to parse Excel file data');
+      }
+      
       if (data.length === 0) {
         throw new Error('Excel file is empty');
+      }
+      
+      // Check if first row (headers) exists and is valid
+      if (!data[0] || !Array.isArray(data[0])) {
+        throw new Error('Excel file does not contain valid headers');
       }
       
       // First row is headers, rest is data
@@ -141,53 +167,96 @@ class FileProcessor {
   // Process CSV file from buffer
   static async processCSVBuffer(buffer) {
     return new Promise((resolve, reject) => {
-      const results = [];
-      
-      const stream = Readable.from(buffer.toString());
-      
-      stream
-        .pipe(csv({
-          mapHeaders: ({ header }) => header.toLowerCase().trim()
-        }))
-        .on('data', (data) => {
-          // Clean up data and remove empty rows
-          const cleanData = {};
-          let hasData = false;
-          
-          Object.keys(data).forEach(key => {
-            const value = String(data[key]).trim();
-            cleanData[key] = value;
-            if (value !== '') hasData = true;
+      try {
+        // Validate buffer
+        if (!buffer || buffer.length === 0) {
+          reject(new Error('CSV file buffer is empty or invalid'));
+          return;
+        }
+
+        const results = [];
+        
+        const stream = Readable.from(buffer.toString());
+        
+        stream
+          .pipe(csv({
+            mapHeaders: ({ header }) => FileProcessor.normalizeHeader(header)
+          }))
+          .on('data', (data) => {
+            // Clean up data and remove empty rows
+            const cleanData = {};
+            let hasData = false;
+            
+            Object.keys(data).forEach(key => {
+              const value = String(data[key]).trim();
+              cleanData[key] = value;
+              if (value !== '') hasData = true;
+            });
+            
+            if (hasData) {
+              results.push(cleanData);
+            }
+          })
+          .on('end', () => {
+            if (results.length === 0) {
+              reject(new Error('CSV file contains no valid data'));
+            } else {
+              resolve(results);
+            }
+          })
+          .on('error', (error) => {
+            reject(new Error(`CSV processing error: ${error.message}`));
           });
-          
-          if (hasData) {
-            results.push(cleanData);
-          }
-        })
-        .on('end', () => {
-          resolve(results);
-        })
-        .on('error', (error) => {
-          reject(new Error(`CSV processing error: ${error.message}`));
-        });
+      } catch (error) {
+        reject(new Error(`CSV processing error: ${error.message}`));
+      }
     });
   }
   
   // Main file processor - works with memory buffer
   static async processFileBuffer(buffer, filename) {
-    const extension = path.extname(filename).toLowerCase();
-    
-    let data;
-    
-    if (extension === '.csv') {
-      data = await this.processCSVBuffer(buffer);
-    } else if (extension === '.xlsx' || extension === '.xls') {
-      data = await this.processExcelBuffer(buffer);
-    } else {
-      throw new Error('Unsupported file format');
+    try {
+      // Validate inputs
+      if (!buffer || buffer.length === 0) {
+        throw new Error('File buffer is empty or invalid');
+      }
+      
+      if (!filename) {
+        throw new Error('Filename is required');
+      }
+      
+      const extension = path.extname(filename).toLowerCase();
+      
+      let data;
+      
+      if (extension === '.csv') {
+        data = await this.processCSVBuffer(buffer);
+      } else if (extension === '.xlsx' || extension === '.xls') {
+        data = await this.processExcelBuffer(buffer);
+      } else {
+        throw new Error(`Unsupported file format: ${extension}. Supported formats: .csv, .xlsx, .xls`);
+      }
+      
+      // Validate processed data
+      if (!data || !Array.isArray(data)) {
+        throw new Error('Failed to process file data');
+      }
+      
+      if (data.length === 0) {
+        throw new Error('No valid data found in file');
+      }
+      
+      return data;
+    } catch (error) {
+      // Re-throw with more context
+      if (error.message.includes('Excel processing error') || 
+          error.message.includes('CSV processing error') ||
+          error.message.includes('Unsupported file format')) {
+        throw error; // Re-throw as-is for specific errors
+      } else {
+        throw new Error(`File processing error: ${error.message}`);
+      }
     }
-    
-    return data;
   }
   
   // Validate brand data
@@ -275,9 +344,10 @@ class FileProcessor {
         return;
       }
       
+      // Sub SKU is optional - if not provided, use group SKU as default
       if (!item.subSku || item.subSku.trim() === '') {
-        errors.push(`Row ${row}: Sub SKU is required`);
-        return;
+        console.log(`Row ${row}: Sub SKU is empty, using Group SKU "${item.groupSku}" as Sub SKU`);
+        item.subSku = item.groupSku; // Use group SKU as sub SKU if not provided
       }
       
       if (!item.brandId && !item.brandName) {

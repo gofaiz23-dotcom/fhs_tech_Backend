@@ -109,6 +109,14 @@ class ProductController {
 
         // Process file upload from memory buffer
         const FileProcessor = (await import('../utils/fileProcessor.js')).default;
+        
+        console.log('🔍 File Processing Debug:', {
+          filename: req.file.originalname,
+          bufferLength: req.file.buffer ? req.file.buffer.length : 'undefined',
+          bufferType: typeof req.file.buffer,
+          mimetype: req.file.mimetype
+        });
+        
         const fileData = await FileProcessor.processFileBuffer(req.file.buffer, req.file.originalname);
         
         console.log('📊 File Data Processed:', {
@@ -235,6 +243,10 @@ class ProductController {
           }
 
           // Note: SubSku duplicate check removed - subSku can be same as groupSku or appear in multiple products
+          // If subSku is empty, use groupSku as default
+          if (!productData.subSku || productData.subSku.trim() === '') {
+            productData.subSku = productData.groupSku;
+          }
 
           // Validate and convert price values
           let brandRealPrice, brandMiscellaneous;
