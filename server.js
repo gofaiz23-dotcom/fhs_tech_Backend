@@ -1,30 +1,18 @@
 import app from './app.js';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+import dbConnection from './src/config/database.js';
 
 // Load environment variables
 dotenv.config();
 
 const PORT = process.env.PORT || 3000;
-const prisma = new PrismaClient();
-
-// Database connection test
-async function connectDatabase() {
-  try {
-    await prisma.$connect();
-    console.log('✅ Database connected successfully');
-  } catch (error) {
-    console.error('❌ Database connection failed:', error);
-    process.exit(1);
-  }
-}
 
 // Graceful shutdown
 async function gracefulShutdown(signal) {
   console.log(`\n🔄 Received ${signal}. Starting graceful shutdown...`);
   
   try {
-    await prisma.$disconnect();
+    await dbConnection.disconnect();
     console.log('✅ Database disconnected successfully');
     process.exit(0);
   } catch (error) {
@@ -40,8 +28,12 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // Start server
 async function startServer() {
   try {
-    // Connect to database
-    await connectDatabase();
+    // Database connection is already handled by the dbConnection singleton
+    // Just verify it's connected
+    const healthCheck = await dbConnection.healthCheck();
+    if (healthCheck.status !== 'healthy') {
+      throw new Error('Database health check failed');
+    }
     
     // Start HTTP server
     const server = app.listen(PORT,"0.0.0.0", () => {
@@ -49,6 +41,7 @@ async function startServer() {
       console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 API URL: http://192.168.0.23:${PORT}/api`);
       console.log(`📊 Health Check: http://192.168.0.23:${PORT}/api/health`);
+      console.log(`💾 Database: ${healthCheck.status}`);
     });
 
     // Handle server errors

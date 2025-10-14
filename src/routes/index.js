@@ -9,6 +9,7 @@ import productPricingRoutes from './productPricingRoutes.js';
 import permissionRoutes from './permissionRoutes.js';
 import managementHistoryRoutes from './managementHistoryRoutes.js';
 import userActivityRoutes from './userActivityRoutes.js';
+import dbConnection from '../config/database.js';
 
 const router = express.Router();
 
@@ -25,12 +26,51 @@ router.use('/management', managementHistoryRoutes);
 router.use('/activities', userActivityRoutes);
 
 // Health check route
-router.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'FHS Tech Backend API is running',
-    timestamp: new Date().toISOString()
-  });
+router.get('/health', async (req, res) => {
+  try {
+    const dbHealth = await dbConnection.healthCheck();
+    const poolMetrics = await dbConnection.getPoolMetrics();
+    
+    res.json({
+      status: 'OK',
+      message: 'FHS Tech Backend API is running',
+      timestamp: new Date().toISOString(),
+      database: {
+        status: dbHealth.status,
+        connected: dbHealth.connected
+      },
+      connectionPool: {
+        connected: poolMetrics.connected,
+        attempts: poolMetrics.attempts,
+        timestamp: poolMetrics.timestamp
+      }
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'ERROR',
+      message: 'Health check failed',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
+});
+
+// Connection pool metrics route (for monitoring)
+router.get('/metrics', async (req, res) => {
+  try {
+    const metrics = await dbConnection.getPoolMetrics();
+    res.json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      metrics
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Failed to get metrics',
+      error: error.message
+    });
+  }
 });
 
 // API documentation route
