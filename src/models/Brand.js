@@ -15,6 +15,23 @@ class BrandModel {
     });
   }
 
+  // Get all brands with pagination
+  static async findAllWithPagination(offset, limit) {
+    const [brands, totalCount] = await Promise.all([
+      prisma.brand.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: offset,
+        take: limit
+      }),
+      prisma.brand.count()
+    ]);
+
+    return {
+      brands,
+      totalCount
+    };
+  }
+
   // Get brands by user access
   static async findByUserAccess(userId) {
     const userAccess = await prisma.userBrandAccess.findMany({
@@ -26,6 +43,33 @@ class BrandModel {
     });
     
     return userAccess.map(access => access.brand);
+  }
+
+  // Get brands by user access with pagination
+  static async findByUserAccessWithPagination(userId, offset, limit) {
+    const [userAccess, totalCount] = await Promise.all([
+      prisma.userBrandAccess.findMany({
+        where: { 
+          userId: userId,
+          isActive: true 
+        },
+        include: { brand: true },
+        skip: offset,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.userBrandAccess.count({
+        where: { 
+          userId: userId,
+          isActive: true 
+        }
+      })
+    ]);
+    
+    return {
+      brands: userAccess.map(access => access.brand),
+      totalCount
+    };
   }
 
   // Find brand by ID

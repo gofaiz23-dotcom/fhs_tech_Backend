@@ -202,16 +202,7 @@ class ProductController {
             continue;
           }
 
-          // Check for duplicate Sub SKU (optional check)
-          const existingSubSku = await ProductModel.checkSubSkuExists(productData.subSku);
-          if (existingSubSku) {
-            results.duplicates.push({
-              title: productData.title,
-              subSku: productData.subSku,
-              error: `Sub SKU "${productData.subSku}" already exists`
-            });
-            continue;
-          }
+          // Note: SubSku duplicate check removed - subSku can be same as groupSku or appear in multiple products
 
           // Validate brandRealPrice is provided
           if (productData.brandRealPrice === undefined || productData.brandRealPrice === null || productData.brandRealPrice === '') {
@@ -657,6 +648,64 @@ class ProductController {
       console.error('Upload product images error:', error);
       res.status(500).json({
         error: 'Failed to upload product images',
+        details: error.message
+      });
+    }
+  }
+
+  // Search product by individual SKU (handles comma-separated subSku)
+  static async getProductBySku(req, res) {
+    try {
+      const { sku } = req.params;
+      
+      if (!sku || sku.trim() === '') {
+        return res.status(400).json({
+          error: 'SKU parameter is required'
+        });
+      }
+
+      const product = await ProductModel.findBySubSku(sku);
+      
+      if (!product) {
+        return res.status(404).json({
+          error: 'Product not found',
+          message: `No product found with SKU: ${sku}`
+        });
+      }
+
+      // Check user access to product's brand (for non-admin users)
+      if (req.user.role !== 'ADMIN') {
+        const hasAccess = await prisma.userBrandAccess.findFirst({
+          where: {
+            userId: req.user.userId,
+            brandId: product.brandId,
+            isActive: true
+          }
+        });
+
+        if (!hasAccess) {
+          return res.status(403).json({
+            error: 'Access denied',
+            message: `You don't have access to products from brand: ${product.brand.name}`
+          });
+        }
+      }
+
+      // Parse individual SKUs for response
+      const individualSkus = ProductModel.parseSubSkus(product.subSku);
+
+      res.json({
+        message: 'Product found successfully',
+        product: {
+          ...product,
+          individualSkus: individualSkus
+        },
+        searchedSku: sku
+      });
+    } catch (error) {
+      console.error('Get product by SKU error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve product',
         details: error.message
       });
     }

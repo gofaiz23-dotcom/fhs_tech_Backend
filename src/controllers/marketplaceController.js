@@ -1,22 +1,35 @@
 import MarketplaceModel from '../models/Marketplace.js';
 
 class MarketplaceController {
-  // Get all marketplaces (filtered by user access for regular users)
+  // Get all marketplaces with pagination (filtered by user access for regular users)
   static async getAllMarketplaces(req, res) {
     try {
-      let marketplaces;
+      // Extract pagination parameters from query
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      const offset = (page - 1) * limit;
+
+      let result;
 
       if (req.user.role === 'ADMIN') {
-        // Admin sees all marketplaces
-        marketplaces = await MarketplaceModel.findAll();
+        // Admin sees all marketplaces with pagination
+        result = await MarketplaceModel.findAllWithPagination(offset, limit);
       } else {
-        // Regular user sees only accessible marketplaces
-        marketplaces = await MarketplaceModel.findByUserAccess(req.user.userId);
+        // Regular user sees only accessible marketplaces with pagination
+        result = await MarketplaceModel.findByUserAccessWithPagination(req.user.userId, offset, limit);
       }
 
       res.json({
         message: 'Marketplaces retrieved successfully',
-        marketplaces: marketplaces
+        marketplaces: result.marketplaces,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(result.totalCount / limit),
+          totalCount: result.totalCount,
+          limit: limit,
+          hasNextPage: page < Math.ceil(result.totalCount / limit),
+          hasPrevPage: page > 1
+        }
       });
     } catch (error) {
       console.error('Get all marketplaces error:', error);

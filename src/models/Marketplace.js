@@ -15,6 +15,23 @@ class MarketplaceModel {
     });
   }
 
+  // Get all marketplaces with pagination
+  static async findAllWithPagination(offset, limit) {
+    const [marketplaces, totalCount] = await Promise.all([
+      prisma.marketplace.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: offset,
+        take: limit
+      }),
+      prisma.marketplace.count()
+    ]);
+
+    return {
+      marketplaces,
+      totalCount
+    };
+  }
+
   // Get marketplaces by user access
   static async findByUserAccess(userId) {
     const userAccess = await prisma.userMarketplaceAccess.findMany({
@@ -26,6 +43,33 @@ class MarketplaceModel {
     });
     
     return userAccess.map(access => access.marketplace);
+  }
+
+  // Get marketplaces by user access with pagination
+  static async findByUserAccessWithPagination(userId, offset, limit) {
+    const [userAccess, totalCount] = await Promise.all([
+      prisma.userMarketplaceAccess.findMany({
+        where: { 
+          userId: userId,
+          isActive: true 
+        },
+        include: { marketplace: true },
+        skip: offset,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.userMarketplaceAccess.count({
+        where: { 
+          userId: userId,
+          isActive: true 
+        }
+      })
+    ]);
+    
+    return {
+      marketplaces: userAccess.map(access => access.marketplace),
+      totalCount
+    };
   }
 
   // Find marketplace by ID

@@ -342,7 +342,7 @@ model Product {
   brandId     Int      @map("brand_id")
   title       String
   groupSku    String   @unique @map("group_sku")
-  subSku      String   @map("sub_sku")
+  subSku      String?  @map("sub_sku")  // Nullable, supports comma-separated values like "123ed,345Df,678gh"
   category    String
   collections String
   shipTypes   String   @map("ship_types")

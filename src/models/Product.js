@@ -210,10 +210,52 @@ class ProductModel {
     });
   }
 
-  // Check if Sub SKU already exists
+  // Check if Sub SKU already exists (for reference only - no duplicate prevention)
   static async checkSubSkuExists(subSku) {
+    if (!subSku || subSku.trim() === '') {
+      return null; // Allow null/empty subSku
+    }
+
+    // Find any existing product with this subSku (for reference only)
     return await prisma.product.findFirst({
-      where: { subSku: subSku }
+      where: {
+        OR: [
+          { subSku: subSku },
+          { subSku: { contains: subSku } } // Check if SKU exists in comma-separated list
+        ]
+      }
+    });
+  }
+
+  // Get individual SKUs from comma-separated string
+  static parseSubSkus(subSku) {
+    if (!subSku || subSku.trim() === '') {
+      return [];
+    }
+    
+    return subSku.split(',')
+      .map(sku => sku.trim())
+      .filter(sku => sku.length > 0);
+  }
+
+  // Search products by individual SKU (handles comma-separated)
+  static async findBySubSku(sku) {
+    if (!sku || sku.trim() === '') {
+      return null;
+    }
+
+    const trimmedSku = sku.trim();
+    
+    return await prisma.product.findFirst({
+      where: {
+        OR: [
+          { subSku: trimmedSku },
+          { subSku: { startsWith: trimmedSku + ',' } },
+          { subSku: { endsWith: ',' + trimmedSku } },
+          { subSku: { contains: ',' + trimmedSku + ',' } }
+        ]
+      },
+      include: { brand: true }
     });
   }
 

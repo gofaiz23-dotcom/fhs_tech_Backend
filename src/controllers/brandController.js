@@ -1,22 +1,35 @@
 import BrandModel from '../models/Brand.js';
 
 class BrandController {
-  // Get all brands (filtered by user access for regular users)
+  // Get all brands with pagination (filtered by user access for regular users)
   static async getAllBrands(req, res) {
     try {
-      let brands;
+      // Extract pagination parameters from query
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      const offset = (page - 1) * limit;
+
+      let result;
 
       if (req.user.role === 'ADMIN') {
-        // Admin sees all brands
-        brands = await BrandModel.findAll();
+        // Admin sees all brands with pagination
+        result = await BrandModel.findAllWithPagination(offset, limit);
       } else {
-        // Regular user sees only accessible brands
-        brands = await BrandModel.findByUserAccess(req.user.userId);
+        // Regular user sees only accessible brands with pagination
+        result = await BrandModel.findByUserAccessWithPagination(req.user.userId, offset, limit);
       }
 
       res.json({
         message: 'Brands retrieved successfully',
-        brands: brands
+        brands: result.brands,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(result.totalCount / limit),
+          totalCount: result.totalCount,
+          limit: limit,
+          hasNextPage: page < Math.ceil(result.totalCount / limit),
+          hasPrevPage: page > 1
+        }
       });
     } catch (error) {
       console.error('Get all brands error:', error);

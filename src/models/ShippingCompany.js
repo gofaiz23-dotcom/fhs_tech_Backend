@@ -15,6 +15,23 @@ class ShippingCompanyModel {
     });
   }
 
+  // Get all shipping companies with pagination
+  static async findAllWithPagination(offset, limit) {
+    const [shippingCompanies, totalCount] = await Promise.all([
+      prisma.shippingCompany.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: offset,
+        take: limit
+      }),
+      prisma.shippingCompany.count()
+    ]);
+
+    return {
+      shippingCompanies,
+      totalCount
+    };
+  }
+
   // Get shipping companies by user access
   static async findByUserAccess(userId) {
     const userAccess = await prisma.userShippingAccess.findMany({
@@ -26,6 +43,33 @@ class ShippingCompanyModel {
     });
     
     return userAccess.map(access => access.shippingCompany);
+  }
+
+  // Get shipping companies by user access with pagination
+  static async findByUserAccessWithPagination(userId, offset, limit) {
+    const [userAccess, totalCount] = await Promise.all([
+      prisma.userShippingAccess.findMany({
+        where: { 
+          userId: userId,
+          isActive: true 
+        },
+        include: { shippingCompany: true },
+        skip: offset,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.userShippingAccess.count({
+        where: { 
+          userId: userId,
+          isActive: true 
+        }
+      })
+    ]);
+    
+    return {
+      shippingCompanies: userAccess.map(access => access.shippingCompany),
+      totalCount
+    };
   }
 
   // Find shipping company by ID
