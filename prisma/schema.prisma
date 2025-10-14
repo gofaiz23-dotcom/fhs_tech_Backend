@@ -38,6 +38,9 @@ model User {
   productActions ProductManagementHistory[] @relation("UserProductActions")
 
   @@map("users")
+  @@index([email])
+  @@index([role])
+  @@index([createdAt])
 }
 
 enum Role {
@@ -60,6 +63,8 @@ model Brand {
   products Product[]
 
   @@map("brands")
+  @@index([name])
+  @@index([createdAt])
 }
 
 // 3. Marketplaces Table
@@ -75,6 +80,8 @@ model Marketplace {
   managementHistory MarketplaceManagementHistory[]
 
   @@map("marketplaces")
+  @@index([name])
+  @@index([createdAt])
 }
 
 // 4. Shipping Companies Table
@@ -90,6 +97,8 @@ model ShippingCompany {
   managementHistory ShippingManagementHistory[]
 
   @@map("shipping_companies")
+  @@index([name])
+  @@index([createdAt])
 }
 
 // 5. Refresh Tokens Table
@@ -105,6 +114,10 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@index([isRevoked])
 }
 
 // 6. User Brand Access Table
@@ -121,6 +134,9 @@ model UserBrandAccess {
 
   @@unique([userId, brandId])
   @@map("user_brand_access")
+  @@index([userId, brandId])
+  @@index([isActive])
+  @@index([createdAt])
 }
 
 // 7. User Marketplace Access Table
@@ -137,6 +153,9 @@ model UserMarketplaceAccess {
 
   @@unique([userId, marketplaceId])
   @@map("user_marketplace_access")
+  @@index([userId, marketplaceId])
+  @@index([isActive])
+  @@index([createdAt])
 }
 
 // 8. User Shipping Access Table
@@ -153,6 +172,9 @@ model UserShippingAccess {
 
   @@unique([userId, shippingCompanyId])
   @@map("user_shipping_access")
+  @@index([userId, shippingCompanyId])
+  @@index([isActive])
+  @@index([createdAt])
 }
 
 // 9. User Login History Table
@@ -171,6 +193,11 @@ model UserLoginHistory {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_login_history")
+  @@index([userId])
+  @@index([loginTime])
+  @@index([logoutTime])
+  @@index([ipAddress])
+  @@index([createdAt])
 }
 
 // Management History Tables
@@ -189,6 +216,10 @@ model UserManagementHistory {
   targetUser  User?    @relation("TargetUserActions", fields: [targetUserId], references: [id], onDelete: SetNull)
 
   @@map("user_management_history")
+  @@index([adminId])
+  @@index([targetUserId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 model BrandManagementHistory {
@@ -206,6 +237,10 @@ model BrandManagementHistory {
   brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
   @@map("brand_management_history")
+  @@index([adminId])
+  @@index([brandId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 model MarketplaceManagementHistory {
@@ -223,6 +258,10 @@ model MarketplaceManagementHistory {
   marketplace Marketplace @relation(fields: [marketplaceId], references: [id], onDelete: Cascade)
 
   @@map("marketplace_management_history")
+  @@index([adminId])
+  @@index([marketplaceId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 model ShippingManagementHistory {
@@ -240,6 +279,10 @@ model ShippingManagementHistory {
   shipping    ShippingCompany @relation(fields: [shippingId], references: [id], onDelete: Cascade)
 
   @@map("shipping_management_history")
+  @@index([adminId])
+  @@index([shippingId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 // Permission Management History
@@ -260,6 +303,12 @@ model PermissionManagementHistory {
   targetUser  User     @relation("TargetUserPermissionActions", fields: [targetUserId], references: [id], onDelete: Cascade)
 
   @@map("permission_management_history")
+  @@index([adminId])
+  @@index([targetUserId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 // Product Management History (Future)
@@ -280,6 +329,11 @@ model ProductManagementHistory {
   product     Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@map("product_management_history")
+  @@index([userId])
+  @@index([brandId])
+  @@index([productId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 // 10. Products Table
@@ -316,4 +370,10 @@ model Product {
   productHistory ProductManagementHistory[]
 
   @@map("products")
+  @@index([brandId])
+  @@index([category])
+  @@index([ecommercePrice])
+  @@index([createdAt])
+  @@index([brandId, category])
+  @@index([brandId, ecommercePrice])
 }

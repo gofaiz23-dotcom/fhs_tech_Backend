@@ -197,12 +197,15 @@ class ProductPricingController {
     }
   }
 
-  // Get all products with pricing summary
+  // Get all products with pricing summary with pagination
   static async getAllProductsPricing(req, res) {
     try {
-      const products = await ProductModel.findAll(req.user.userId, req.user.role);
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      
+      const result = await ProductModel.findAll(req.user.userId, req.user.role, page, limit);
 
-      const productsWithPricing = products.map(product => ({
+      const productsWithPricing = result.products.map(product => ({
         id: product.id,
         title: product.title,
         groupSku: product.groupSku,
@@ -217,8 +220,8 @@ class ProductPricingController {
 
       res.json({
         message: 'Products pricing retrieved successfully',
-        count: productsWithPricing.length,
-        products: productsWithPricing
+        products: productsWithPricing,
+        pagination: result.pagination
       });
     } catch (error) {
       console.error('Get all products pricing error:', error);
@@ -234,8 +237,9 @@ class ProductPricingController {
     try {
       const { shippingPrice, commissionPrice, profitMarginPrice, ecommerceMiscellaneous } = req.body;
       
-      // Get all products
-      const products = await ProductModel.findAll(req.user.userId, req.user.role);
+      // Get all products (for bulk operations, we need all products)
+      const result = await ProductModel.findAll(req.user.userId, req.user.role, 1, 1000000); // Large limit for bulk operations
+      const products = result.products;
       
       const updatedProducts = [];
       const errors = [];
@@ -324,8 +328,9 @@ class ProductPricingController {
         });
       }
       
-      // Get all products
-      const products = await ProductModel.findAll(req.user.userId, req.user.role);
+      // Get all products (for bulk operations, we need all products)
+      const result = await ProductModel.findAll(req.user.userId, req.user.role, 1, 1000000); // Large limit for bulk operations
+      const products = result.products;
       
       const updatedProducts = [];
       const errors = [];

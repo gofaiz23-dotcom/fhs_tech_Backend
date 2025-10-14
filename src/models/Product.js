@@ -1,49 +1,109 @@
 import prisma from '../config/database.js';
 
 class ProductModel {
-  // Find all products (filtered by user access for regular users)
-  static async findAll(userId = null, userRole = null) {
+  // Find all products with pagination (filtered by user access for regular users)
+  static async findAll(userId = null, userRole = null, page = 1, limit = 20, filters = {}) {
+    const skip = (page - 1) * limit;
+    
+    // Build where clause based on user role and filters
+    let whereClause = {};
+    
     if (userRole === 'ADMIN') {
-      // Admin sees all products
-      return await prisma.product.findMany({
-        include: {
-          brand: {
-            select: {
-              id: true,
-              name: true,
-              description: true
-            }
-          }
-        },
-        orderBy: { createdAt: 'desc' }
-      });
+      // Admin sees all products, apply filters
+      whereClause = this.buildWhereClause(filters);
     } else if (userId) {
       // Regular user sees only products from accessible brands
-      return await prisma.product.findMany({
-        where: {
-          brand: {
-            userBrandAccess: {
-              some: {
-                userId: userId,
-                isActive: true
+      whereClause = {
+        AND: [
+          {
+            brand: {
+              userBrandAccess: {
+                some: {
+                  userId: userId,
+                  isActive: true
+                }
               }
             }
-          }
-        },
-        include: {
-          brand: {
-            select: {
-              id: true,
-              name: true,
-              description: true
-            }
-          }
-        },
-        orderBy: { createdAt: 'desc' }
-      });
+          },
+          this.buildWhereClause(filters)
+        ]
+      };
     } else {
-      return [];
+      return { products: [], pagination: { totalCount: 0, totalPages: 0, currentPage: page, hasNextPage: false, hasPrevPage: false } };
     }
+
+    // Get total count for pagination
+    const totalCount = await prisma.product.count({ where: whereClause });
+    
+    // Get paginated products
+    const products = await prisma.product.findMany({
+      where: whereClause,
+      include: {
+        brand: {
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: skip,
+      take: limit
+    });
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    return {
+      products: products,
+      pagination: {
+        totalCount: totalCount,
+        totalPages: totalPages,
+        currentPage: page,
+        itemsPerPage: limit,
+        hasNextPage: hasNextPage,
+        hasPrevPage: hasPrevPage
+      }
+    };
+  }
+
+  // Build where clause from filters
+  static buildWhereClause(filters) {
+    const whereClause = {};
+    
+    if (filters.brandId) {
+      whereClause.brandId = parseInt(filters.brandId);
+    }
+    
+    if (filters.category) {
+      whereClause.category = {
+        contains: filters.category,
+        mode: 'insensitive'
+      };
+    }
+    
+    if (filters.minPrice || filters.maxPrice) {
+      whereClause.ecommercePrice = {};
+      if (filters.minPrice) {
+        whereClause.ecommercePrice.gte = parseFloat(filters.minPrice);
+      }
+      if (filters.maxPrice) {
+        whereClause.ecommercePrice.lte = parseFloat(filters.maxPrice);
+      }
+    }
+    
+    if (filters.search) {
+      whereClause.OR = [
+        { title: { contains: filters.search, mode: 'insensitive' } },
+        { groupSku: { contains: filters.search, mode: 'insensitive' } },
+        { subSku: { contains: filters.search, mode: 'insensitive' } }
+      ];
+    }
+    
+    return whereClause;
   }
 
   // Find product by ID (for update/delete operations)

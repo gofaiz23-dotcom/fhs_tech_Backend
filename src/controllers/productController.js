@@ -4,33 +4,51 @@ import ImageService from '../services/imageService.js';
 import prisma from '../config/database.js';
 
 class ProductController {
-  // Get all products (filtered by user access for regular users)
+  // Get all products with pagination (filtered by user access for regular users)
   static async getAllProducts(req, res) {
     try {
+      // Extract pagination parameters from query
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      
+      // Extract filters from query
+      const filters = {
+        brandId: req.query.brandId,
+        category: req.query.category,
+        minPrice: req.query.minPrice,
+        maxPrice: req.query.maxPrice,
+        search: req.query.search
+      };
+
       console.log('🔍 User Access Check:', {
         userId: req.user.userId,
         role: req.user.role,
-        email: req.user.email
+        email: req.user.email,
+        page: page,
+        limit: limit,
+        filters: filters
       });
 
-      const products = await ProductModel.findAll(req.user.userId, req.user.role);
+      const result = await ProductModel.findAll(req.user.userId, req.user.role, page, limit, filters);
 
       console.log('📦 Products Found:', {
-        totalProducts: products.length,
+        totalProducts: result.pagination.totalCount,
+        currentPage: result.pagination.currentPage,
+        totalPages: result.pagination.totalPages,
         userRole: req.user.role,
         userId: req.user.userId
       });
 
       res.json({
         message: 'Products retrieved successfully',
-        count: products.length,
         userAccess: {
           userId: req.user.userId,
           role: req.user.role,
           email: req.user.email
         },
         timestamp: new Date().toISOString(),
-        products: products
+        products: result.products,
+        pagination: result.pagination
       });
     } catch (error) {
       console.error('Get all products error:', error);

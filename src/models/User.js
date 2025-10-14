@@ -67,9 +67,13 @@ class UserModel {
     });
   }
 
-  // Get all users with login history
-  static async findAllWithHistory() {
-    return await prisma.user.findMany({
+  // Get all users with login history with pagination
+  static async findAllWithHistory(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    
+    const totalCount = await prisma.user.count();
+    
+    const users = await prisma.user.findMany({
       select: {
         id: true,
         username: true,
@@ -93,8 +97,27 @@ class UserModel {
           where: { isActive: true },
           include: { shippingCompany: true }
         }
-      }
+      },
+      skip: skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' }
     });
+
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    return {
+      users: users,
+      pagination: {
+        totalCount: totalCount,
+        totalPages: totalPages,
+        currentPage: page,
+        itemsPerPage: limit,
+        hasNextPage: hasNextPage,
+        hasPrevPage: hasPrevPage
+      }
+    };
   }
 
   // Update user email
@@ -196,9 +219,13 @@ class UserModel {
     });
   }
 
-  // API 1: Get users basic details only (email, role)
-  static async getAllUsersBasic() {
-    return await prisma.user.findMany({
+  // API 1: Get users basic details only (email, role) with pagination
+  static async getAllUsersBasic(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    
+    const totalCount = await prisma.user.count();
+    
+    const users = await prisma.user.findMany({
       select: {
         id: true,
         username: true,
@@ -207,12 +234,34 @@ class UserModel {
         createdAt: true,
         updatedAt: true
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      skip: skip,
+      take: limit
     });
+
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    return {
+      users: users,
+      pagination: {
+        totalCount: totalCount,
+        totalPages: totalPages,
+        currentPage: page,
+        itemsPerPage: limit,
+        hasNextPage: hasNextPage,
+        hasPrevPage: hasPrevPage
+      }
+    };
   }
 
-  // API 2: Get users with login history
-  static async getAllUsersWithHistory() {
+  // API 2: Get users with login history with pagination
+  static async getAllUsersWithHistory(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    
+    const totalCount = await prisma.user.count();
+    
     const users = await prisma.user.findMany({
       select: {
         id: true,
@@ -225,10 +274,12 @@ class UserModel {
           orderBy: { loginTime: 'desc' }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      skip: skip,
+      take: limit
     });
 
-    return users.map(user => {
+    const processedUsers = users.map(user => {
       // Calculate login statistics
       const totalSessions = user.loginHistory.length;
       const totalLoginMinutes = user.loginHistory.reduce((total, session) => {
@@ -273,6 +324,22 @@ class UserModel {
         }))
       };
     });
+
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    return {
+      users: processedUsers,
+      pagination: {
+        totalCount: totalCount,
+        totalPages: totalPages,
+        currentPage: page,
+        itemsPerPage: limit,
+        hasNextPage: hasNextPage,
+        hasPrevPage: hasPrevPage
+      }
+    };
   }
 
   // API 3: Get users with brand access only
@@ -324,8 +391,11 @@ class UserModel {
     }));
   }
 
-  // Get ALL users with complete access details and login statistics
-  static async getAllUsersWithCompleteAccess() {
+  // Get ALL users with complete access details and login statistics with pagination
+  static async getAllUsersWithCompleteAccess(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    
+    const totalCount = await prisma.user.count();
     const users = await prisma.user.findMany({
       include: {
         userBrandAccess: {
@@ -364,11 +434,14 @@ class UserModel {
         loginHistory: {
           orderBy: { loginTime: 'desc' }
         }
-      }
+      },
+      skip: skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' }
     });
 
     // Format the response with complete access details and login stats
-    return users.map(user => {
+    const processedUsers = users.map(user => {
       // Calculate login statistics
       const totalSessions = user.loginHistory.length;
       const totalLoginMinutes = user.loginHistory.reduce((total, session) => {
@@ -454,6 +527,22 @@ class UserModel {
         }
       };
     });
+
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    return {
+      users: processedUsers,
+      pagination: {
+        totalCount: totalCount,
+        totalPages: totalPages,
+        currentPage: page,
+        itemsPerPage: limit,
+        hasNextPage: hasNextPage,
+        hasPrevPage: hasPrevPage
+      }
+    };
   }
 }
 

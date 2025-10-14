@@ -4,15 +4,18 @@ import { hashPassword } from '../utils/bcrypt.js';
 import ManagementLogger from '../utils/managementLogger.js';
 
 class AdminController {
-  // API 1: Get users basic details only (email, role)
+  // API 1: Get users basic details only (email, role) with pagination
   static async getUsersBasic(req, res) {
     try {
-      const users = await UserModel.getAllUsersBasic();
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      
+      const result = await UserModel.getAllUsersBasic(page, limit);
 
       res.json({
         message: 'Users basic details retrieved successfully',
-        count: users.length,
-        users: users
+        users: result.users,
+        pagination: result.pagination
       });
     } catch (error) {
       console.error('Get users basic error:', error);
@@ -23,15 +26,18 @@ class AdminController {
     }
   }
 
-  // API 2: Get users with login history
+  // API 2: Get users with login history with pagination
   static async getUsersWithHistory(req, res) {
     try {
-      const users = await UserModel.getAllUsersWithHistory();
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      
+      const result = await UserModel.getAllUsersWithHistory(page, limit);
 
       res.json({
         message: 'Users with login history retrieved successfully',
-        count: users.length,
-        users: users
+        users: result.users,
+        pagination: result.pagination
       });
     } catch (error) {
       console.error('Get users with history error:', error);
@@ -42,15 +48,18 @@ class AdminController {
     }
   }
 
-  // API 3: Get users with complete access details (brands + marketplaces + shipping)
+  // API 3: Get users with complete access details (brands + marketplaces + shipping) with pagination
   static async getUsersWithAllAccess(req, res) {
     try {
-      const users = await UserModel.getAllUsersWithCompleteAccess();
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      
+      const result = await UserModel.getAllUsersWithCompleteAccess(page, limit);
 
       res.json({
         message: 'Users with complete access details retrieved successfully',
-        count: users.length,
-        users: users
+        users: result.users,
+        pagination: result.pagination
       });
     } catch (error) {
       console.error('Get users with complete access error:', error);
