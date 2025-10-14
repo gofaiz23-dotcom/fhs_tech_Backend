@@ -24,9 +24,14 @@ This is a complete employee authentication and authorization system with:
 4. **[Marketplaces APIs](04_Marketplaces_APIs.md)** - Marketplace CRUD operations
 5. **[Shipping APIs](05_Shipping_APIs.md)** - Shipping company CRUD operations
 
+### Product Management APIs
+6. **[Products APIs](08_Products_APIs.md)** - Product CRUD operations with SKU management
+7. **[Product Pricing APIs](09_Product_Pricing_APIs.md)** - Comprehensive pricing management
+
 ### Permission & History APIs
-6. **[Permissions APIs](06_Permissions_APIs.md)** - User access management
-7. **[Login History APIs](07_Login_History_APIs.md)** - Session tracking
+8. **[Permissions APIs](06_Permissions_APIs.md)** - User access management
+9. **[Login History APIs](07_Login_History_APIs.md)** - Session tracking
+10. **[Management History APIs](10_Management_History_APIs.md)** - Audit trail and management tracking
 
 ## 🔑 Key Features
 
@@ -50,6 +55,20 @@ This is a complete employee authentication and authorization system with:
 - **Bulk Import**: CSV/Excel files processed from memory
 - **Supported Formats**: .csv, .xlsx, .xls files
 - **Memory Processing**: No temporary file storage required
+- **Image Uploads**: Support for multiple image files and URL downloads
+- **Unlimited Files**: No limit on number of files uploaded
+
+### Product Management
+- **Advanced SKU Handling**: Comma-separated multiple SKUs
+- **Flexible SKU Rules**: SubSku can be null, duplicate, or same as groupSku
+- **Pagination**: Handles millions of records efficiently
+- **Search by SKU**: Find products by individual SKU from comma-separated lists
+
+### Pricing System
+- **Comprehensive Pricing**: Brand and ecommerce pricing components
+- **Bulk Updates**: Update pricing for multiple products or entire brands
+- **Pricing Analytics**: Detailed pricing statistics and insights
+- **Calculation Engine**: Real-time pricing calculations
 
 ## 🚀 Quick Start
 

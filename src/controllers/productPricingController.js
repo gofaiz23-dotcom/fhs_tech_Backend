@@ -1,8 +1,35 @@
 import ProductModel from '../models/Product.js';
-import prisma from '../config/database.js';
+import { prisma } from '../config/database.js';
 import ManagementLogger from '../utils/managementLogger.js';
 
 class ProductPricingController {
+  // Helper method for validating and converting price values
+  static validatePrice(value, fieldName) {
+    // Handle null/undefined/empty
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    
+    // Convert to string first to handle all types, then trim
+    const valueStr = String(value).trim();
+    
+    // If empty after trimming, return null
+    if (valueStr === '') {
+      return null;
+    }
+    
+    // Try to parse as float
+    const numericValue = parseFloat(valueStr);
+    
+    // Check if it's a valid number and not negative
+    if (isNaN(numericValue) || numericValue < 0) {
+      throw new Error(`Invalid ${fieldName}: "${value}" - must be a valid positive number`);
+    }
+    
+    // Return as decimal with 2 decimal places for consistency
+    return parseFloat(numericValue.toFixed(2));
+  }
+
   // Get product with pricing details
   static async getProductPricing(req, res) {
     try {

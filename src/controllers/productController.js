@@ -1,9 +1,36 @@
 import ProductModel from '../models/Product.js';
 import ManagementLogger from '../utils/managementLogger.js';
 import ImageService from '../services/imageService.js';
-import prisma from '../config/database.js';
+import { prisma } from '../config/database.js';
 
 class ProductController {
+  // Helper method for validating and converting price values
+  static validatePrice(value, fieldName) {
+    // Handle null/undefined/empty
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    
+    // Convert to string first to handle all types, then trim
+    const valueStr = String(value).trim();
+    
+    // If empty after trimming, return null
+    if (valueStr === '') {
+      return null;
+    }
+    
+    // Try to parse as float
+    const numericValue = parseFloat(valueStr);
+    
+    // Check if it's a valid number and not negative
+    if (isNaN(numericValue) || numericValue < 0) {
+      throw new Error(`Invalid ${fieldName}: "${value}" - must be a valid positive number`);
+    }
+    
+    // Return as decimal with 2 decimal places for consistency
+    return parseFloat(numericValue.toFixed(2));
+  }
+
   // Get all products with pagination (filtered by user access for regular users)
   static async getAllProducts(req, res) {
     try {
@@ -128,20 +155,25 @@ class ProductController {
             collections: product.collections?.trim(),
             shipTypes: product.shipTypes?.trim(),
             singleSetItem: product.singleSetItem?.trim(),
+            brandRealPrice: product.brandRealPrice,
+            brandMiscellaneous: product.brandMiscellaneous,
             attributes: product.attributes || {}
           }));
-        } else if (title && groupSku && subSku) {
+        } else if (title && groupSku) {
           // Single product
+          const { brandRealPrice, brandMiscellaneous } = req.body;
           productsToCreate = [{
             brandId: brandId,
             brandName: brandName,
             title: title.trim(),
             groupSku: groupSku.trim(),
-            subSku: subSku.trim(),
+            subSku: subSku?.trim() || '',
             category: category?.trim() || '',
             collections: collections?.trim() || '',
             shipTypes: shipTypes?.trim() || '',
             singleSetItem: singleSetItem?.trim() || '',
+            brandRealPrice: brandRealPrice,
+            brandMiscellaneous: brandMiscellaneous,
             attributes: attributes || {}
           }];
         } else {
@@ -204,9 +236,31 @@ class ProductController {
 
           // Note: SubSku duplicate check removed - subSku can be same as groupSku or appear in multiple products
 
-          // Validate brandRealPrice is provided
-          if (productData.brandRealPrice === undefined || productData.brandRealPrice === null || productData.brandRealPrice === '') {
-            results.errors.push(`Product "${productData.title}": Brand Real Price is mandatory`);
+          // Validate and convert price values
+          let brandRealPrice, brandMiscellaneous;
+          
+          console.log('🔍 Price Validation Debug:', {
+            title: productData.title,
+            brandRealPrice: productData.brandRealPrice,
+            brandRealPriceType: typeof productData.brandRealPrice,
+            brandMiscellaneous: productData.brandMiscellaneous,
+            brandMiscellaneousType: typeof productData.brandMiscellaneous
+          });
+          
+          try {
+            brandRealPrice = ProductController.validatePrice(productData.brandRealPrice, 'Brand Real Price');
+            console.log('✅ Brand Real Price validation result:', brandRealPrice);
+            
+            if (brandRealPrice === null) {
+              results.errors.push(`Product "${productData.title}": Brand Real Price is mandatory`);
+              continue;
+            }
+            
+            brandMiscellaneous = ProductController.validatePrice(productData.brandMiscellaneous, 'Brand Miscellaneous') || 0;
+            console.log('✅ Brand Miscellaneous validation result:', brandMiscellaneous);
+          } catch (error) {
+            console.error('❌ Price validation error:', error.message);
+            results.errors.push(`Product "${productData.title}": ${error.message}`);
             continue;
           }
 
@@ -266,9 +320,9 @@ class ProductController {
             collections: productData.collections,
             shipTypes: productData.shipTypes,
             singleSetItem: productData.singleSetItem,
-            // Brand Pricing (brandRealPrice is mandatory, others default to 0)
-            brandRealPrice: parseFloat(productData.brandRealPrice),
-            brandMiscellaneous: parseFloat(productData.brandMiscellaneous) || 0,
+            // Brand Pricing (using validated and converted values)
+            brandRealPrice: brandRealPrice,
+            brandMiscellaneous: brandMiscellaneous,
             // Ecommerce Pricing (All default to 0 - will be set via separate API)
             shippingPrice: 0,
             commissionPrice: 0,
