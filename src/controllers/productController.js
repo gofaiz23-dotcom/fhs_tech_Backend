@@ -173,22 +173,24 @@ class ProductController {
             }
           }
 
-          // Check for duplicate SKU
-          const existingProduct = await prisma.product.findFirst({
-            where: {
-              OR: [
-                { groupSku: productData.groupSku },
-                { subSku: productData.subSku }
-              ]
-            }
-          });
-
-          if (existingProduct) {
+          // Check for duplicate Group SKU (MANDATORY UNIQUE)
+          const existingGroupSku = await ProductModel.checkGroupSkuExists(productData.groupSku);
+          if (existingGroupSku) {
             results.duplicates.push({
               title: productData.title,
               groupSku: productData.groupSku,
+              error: `Group SKU "${productData.groupSku}" already exists - Group SKU must be unique!`
+            });
+            continue;
+          }
+
+          // Check for duplicate Sub SKU (optional check)
+          const existingSubSku = await ProductModel.checkSubSkuExists(productData.subSku);
+          if (existingSubSku) {
+            results.duplicates.push({
+              title: productData.title,
               subSku: productData.subSku,
-              error: 'Product with this SKU already exists'
+              error: `Sub SKU "${productData.subSku}" already exists`
             });
             continue;
           }
@@ -504,9 +506,9 @@ class ProductController {
         failed: []
       };
 
-      // Handle uploaded files
+      // Handle uploaded files - UNLIMITED SUPPORT
       if (req.files && req.files.length > 0) {
-        console.log('📁 Files Uploaded:', req.files.length);
+        console.log('📁 Files Uploaded:', req.files.length, 'UNLIMITED SUPPORT!');
         
         for (const file of req.files) {
           try {
@@ -527,12 +529,14 @@ class ProductController {
         }
       }
 
-      // Handle image URLs (download from URLs)
+      // Handle image URLs (download from URLs) - Supports unlimited URLs
       if (imageUrls) {
         console.log('🌐 Processing Image URLs:', imageUrls);
         
-        const urls = typeof imageUrls === 'string' ? imageUrls.split(',').map(url => url.trim()) : imageUrls;
+        const urls = typeof imageUrls === 'string' ? imageUrls.split(',').map(url => url.trim()).filter(url => url) : imageUrls;
         const productSku = groupSku || subSku;
+        
+        console.log(`📊 Total URLs to process: ${urls.length} - UNLIMITED SUPPORT!`);
         
         try {
           const downloadResults = await ImageService.downloadMultipleImages(urls, productSku);

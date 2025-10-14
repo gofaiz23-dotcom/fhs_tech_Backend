@@ -109,12 +109,12 @@ const memoryUpload = multer({
   }
 });
 
-// Configure multer for image uploads
+// Configure multer for image uploads - NO SIZE LIMIT
 const imageUpload = multer({
   storage: imageStorage,
   fileFilter: imageFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit for images
+    fileSize: 50 * 1024 * 1024 // 50MB limit per image (increased for high-quality images)
   }
 });
 
@@ -127,8 +127,8 @@ export const uploadMemory = memoryUpload.single('file');
 // Image upload middleware
 export const uploadImage = imageUpload.single('image');
 
-// Multiple image upload middleware
-export const uploadImages = imageUpload.array('images', 10); // Max 10 images
+// Multiple image upload middleware - UNLIMITED images
+export const uploadImages = imageUpload.array('images'); // NO LIMIT - Upload as many as you want!
 
 // Handle multer errors
 export const handleUploadError = (error, req, res, next) => {

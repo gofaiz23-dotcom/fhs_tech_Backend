@@ -176,7 +176,7 @@ class FileProcessor {
       }
       
       if (!item.groupSku || item.groupSku.trim() === '') {
-        errors.push(`Row ${row}: Group SKU is required`);
+        errors.push(`Row ${row}: Group SKU is required and must be unique`);
         return;
       }
       

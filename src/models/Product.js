@@ -143,6 +143,20 @@ class ProductModel {
     });
   }
 
+  // Check if Group SKU already exists
+  static async checkGroupSkuExists(groupSku) {
+    return await prisma.product.findUnique({
+      where: { groupSku: groupSku }
+    });
+  }
+
+  // Check if Sub SKU already exists
+  static async checkSubSkuExists(subSku) {
+    return await prisma.product.findFirst({
+      where: { subSku: subSku }
+    });
+  }
+
 }
 
 export default ProductModel;
