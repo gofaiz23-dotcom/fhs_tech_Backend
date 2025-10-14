@@ -130,6 +130,18 @@ export const uploadImage = imageUpload.single('image');
 // Multiple image upload middleware - UNLIMITED images
 export const uploadImages = imageUpload.array('images'); // NO LIMIT - Upload as many as you want!
 
+// Conditional upload middleware - handles both JSON and Form Data
+export const conditionalImageUpload = (req, res, next) => {
+  // Check if request is JSON
+  if (req.get('Content-Type') && req.get('Content-Type').includes('application/json')) {
+    // Skip multer for JSON requests
+    return next();
+  } else {
+    // Use multer for form data requests
+    return uploadImages(req, res, next);
+  }
+};
+
 // Handle multer errors
 export const handleUploadError = (error, req, res, next) => {
   if (error instanceof multer.MulterError) {

@@ -4,6 +4,101 @@ import path from 'path';
 import { Readable } from 'stream';
 
 class FileProcessor {
+  // Normalize header names to handle various formats
+  static normalizeHeader(header) {
+    if (!header) return '';
+    
+    // Convert to lowercase and remove extra spaces
+    let normalized = header.toLowerCase().trim();
+    
+    // Replace various separators with underscores
+    normalized = normalized
+      .replace(/[,\s-]+/g, '_')  // Replace commas, spaces, hyphens with underscores
+      .replace(/_+/g, '_')       // Replace multiple underscores with single underscore
+      .replace(/^_|_$/g, '');    // Remove leading/trailing underscores
+    
+    // Handle specific field mappings
+    const fieldMappings = {
+      // Group SKU variations
+      'group_sku': 'groupSku',
+      'group_sk_u': 'groupSku',
+      'groupsku': 'groupSku',
+      'group': 'groupSku',
+      
+      // Sub SKU variations
+      'sub_sku': 'subSku',
+      'sub_sk_u': 'subSku',
+      'subsku': 'subSku',
+      'sub': 'subSku',
+      
+      // Brand Name variations
+      'brand_name': 'brandName',
+      'brandname': 'brandName',
+      'brand': 'brandName',
+      
+      // Brand Real Price variations
+      'brand_real_price': 'brandRealPrice',
+      'brandrealprice': 'brandRealPrice',
+      'brand_realprice': 'brandRealPrice',
+      'brandprice': 'brandRealPrice',
+      'real_price': 'brandRealPrice',
+      'realprice': 'brandRealPrice',
+      
+      // MSRP variations
+      'msrp': 'msrp',
+      'manufacturer_suggested_retail_price': 'msrp',
+      'suggested_price': 'msrp',
+      
+      // Brand Miscellaneous variations
+      'brand_miscellaneous': 'brandMiscellaneous',
+      'brandmiscellaneous': 'brandMiscellaneous',
+      'miscellaneous': 'brandMiscellaneous',
+      'misc': 'brandMiscellaneous',
+      
+      // Collection Name variations
+      'collection_name': 'collectionName',
+      'collectionname': 'collectionName',
+      'collection': 'collectionName',
+      'collections': 'collectionName',
+      
+      // Ship Types variations
+      'ship_types': 'shipTypes',
+      'shiptypes': 'shipTypes',
+      'shipping_types': 'shipTypes',
+      'shippingtypes': 'shipTypes',
+      'ship': 'shipTypes',
+      
+      // Single Set Item variations
+      'single_set_item': 'singleSetItem',
+      'singlesetitem': 'singleSetItem',
+      'single_setitem': 'singleSetItem',
+      'single_set': 'singleSetItem',
+      'singleset': 'singleSetItem',
+      'set_item': 'singleSetItem',
+      'setitem': 'singleSetItem',
+      
+      // Main Image URL variations
+      'main_image_url': 'mainImageUrl',
+      'mainimageurl': 'mainImageUrl',
+      'main_imageurl': 'mainImageUrl',
+      'main_image': 'mainImageUrl',
+      'mainimage': 'mainImageUrl',
+      'image_url': 'mainImageUrl',
+      'imageurl': 'mainImageUrl',
+      
+      // Gallery Images variations
+      'gallery_images': 'galleryImages',
+      'galleryimages': 'galleryImages',
+      'gallery_image': 'galleryImages',
+      'galleryimage': 'galleryImages',
+      'gallery': 'galleryImages',
+      'images': 'galleryImages'
+    };
+    
+    // Return mapped field or original normalized name
+    return fieldMappings[normalized] || normalized;
+  }
+
   // Process Excel file from buffer (.xlsx, .xls)
   static async processExcelBuffer(buffer) {
     try {
@@ -22,7 +117,7 @@ class FileProcessor {
       }
       
       // First row is headers, rest is data
-      const headers = data[0].map(header => String(header).toLowerCase().trim());
+      const headers = data[0].map(header => FileProcessor.normalizeHeader(String(header).trim()));
       const rows = data.slice(1);
       
       // Convert to objects
@@ -196,24 +291,55 @@ class FileProcessor {
         return;
       }
       
+      // MSRP is mandatory
+      if (item.msrp === undefined || item.msrp === null || item.msrp === '') {
+        errors.push(`Row ${row}: MSRP is mandatory`);
+        return;
+      }
+      
       // Extract attributes (all fields except the main product fields and pricing fields)
       const attributes = {};
-      const pricingFields = ['brandRealPrice', 'brandMiscellaneous', 'shippingPrice', 'commissionPrice', 'profitMarginPrice', 'ecommerceMiscellaneous'];
-      const mainFields = ['title', 'groupSku', 'subSku', 'brandId', 'brandName', 'category', 'collections', 'shipTypes', 'singleSetItem'];
+      const pricingFields = ['brandRealPrice', 'brandMiscellaneous', 'msrp', 'shippingPrice', 'commissionPrice', 'profitMarginPrice', 'ecommerceMiscellaneous'];
+      const mainFields = ['title', 'groupSku', 'subSku', 'brandId', 'brandName', 'category', 'collectionName', 'shipTypes', 'singleSetItem'];
+      
+      // Collect all gallery images from different columns
+      let allGalleryImages = [];
       
       Object.keys(item).forEach(key => {
         if (!mainFields.includes(key) && !pricingFields.includes(key)) {
           // Handle image fields specially
-          if (key === 'mainImageUrl' || key === 'galleryImages') {
-            if (key === 'galleryImages' && typeof item[key] === 'string') {
-              // If galleryImages is a string (comma-separated URLs), convert to array
-              attributes[key] = item[key].split(',').map(url => url.trim()).filter(url => url);
-            } else {
-              attributes[key] = item[key];
+          if (key === 'mainImageUrl') {
+            attributes[key] = item[key];
+          } else if (key === 'galleryImages' || key.startsWith('galleryImage')) {
+            // Handle gallery images (both single column and multiple columns)
+            if (item[key] && item[key].trim() !== '') {
+              if (typeof item[key] === 'string') {
+                // If it's a string (comma-separated URLs), split and add to gallery
+                const urls = item[key].split(',').map(url => url.trim()).filter(url => url);
+                allGalleryImages = [...allGalleryImages, ...urls];
+              } else if (Array.isArray(item[key])) {
+                // If it's already an array, add to gallery
+                allGalleryImages = [...allGalleryImages, ...item[key]];
+              }
             }
           } else {
             attributes[key] = item[key];
           }
+        }
+      });
+      
+      // Set the combined gallery images
+      if (allGalleryImages.length > 0) {
+        attributes.galleryImages = allGalleryImages;
+      }
+      
+      // Filter out empty/null values from attributes
+      Object.keys(attributes).forEach(key => {
+        const value = attributes[key];
+        if (value === null || value === undefined || value === '' || 
+            (Array.isArray(value) && value.length === 0) ||
+            (typeof value === 'object' && Object.keys(value).length === 0)) {
+          delete attributes[key];
         }
       });
       
@@ -224,12 +350,13 @@ class FileProcessor {
         groupSku: item.groupSku.trim(),
         subSku: item.subSku.trim(),
         category: item.category ? item.category.trim() : '',
-        collections: item.collections ? item.collections.trim() : '',
+        collectionName: item.collectionName ? item.collectionName.trim() : '',
         shipTypes: item.shipTypes ? item.shipTypes.trim() : '',
         singleSetItem: item.singleSetItem ? item.singleSetItem.trim() : '',
-        // Brand Pricing (brandRealPrice is mandatory, others default to 0)
+        // Brand Pricing (brandRealPrice and msrp are mandatory, others default to 0)
         brandRealPrice: parseFloat(item.brandRealPrice),
         brandMiscellaneous: parseFloat(item.brandMiscellaneous) || 0,
+        msrp: parseFloat(item.msrp),
         // Ecommerce Pricing (All default to 0 - will be set via separate API)
         shippingPrice: 0,
         commissionPrice: 0,

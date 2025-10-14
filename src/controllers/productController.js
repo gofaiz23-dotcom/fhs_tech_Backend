@@ -141,7 +141,7 @@ class ProductController {
         productsToCreate = validData;
       } else {
         // Handle JSON data (single or multiple products)
-        const { products, brandId, brandName, title, groupSku, subSku, category, collections, shipTypes, singleSetItem, attributes } = req.body;
+        const { products, brandId, brandName, title, groupSku, subSku, category, collectionName, shipTypes, singleSetItem, attributes } = req.body;
 
         if (products && Array.isArray(products)) {
           // Multiple products
@@ -152,7 +152,7 @@ class ProductController {
             groupSku: product.groupSku?.trim(),
             subSku: product.subSku?.trim(),
             category: product.category?.trim(),
-            collections: product.collections?.trim(),
+            collectionName: product.collectionName?.trim(),
             shipTypes: product.shipTypes?.trim(),
             singleSetItem: product.singleSetItem?.trim(),
             brandRealPrice: product.brandRealPrice,
@@ -169,7 +169,7 @@ class ProductController {
             groupSku: groupSku.trim(),
             subSku: subSku?.trim() || '',
             category: category?.trim() || '',
-            collections: collections?.trim() || '',
+            collectionName: collectionName?.trim() || '',
             shipTypes: shipTypes?.trim() || '',
             singleSetItem: singleSetItem?.trim() || '',
             brandRealPrice: brandRealPrice,
@@ -258,6 +258,15 @@ class ProductController {
             
             brandMiscellaneous = ProductController.validatePrice(productData.brandMiscellaneous, 'Brand Miscellaneous') || 0;
             console.log('✅ Brand Miscellaneous validation result:', brandMiscellaneous);
+            
+            // Validate MSRP
+            const msrp = ProductController.validatePrice(productData.msrp, 'MSRP');
+            console.log('✅ MSRP validation result:', msrp);
+            
+            if (msrp === null) {
+              results.errors.push(`Product "${productData.title}": MSRP is mandatory`);
+              continue;
+            }
           } catch (error) {
             console.error('❌ Price validation error:', error.message);
             results.errors.push(`Product "${productData.title}": ${error.message}`);
@@ -266,6 +275,17 @@ class ProductController {
 
           // Process image URLs if present in attributes
           let finalAttributes = { ...productData.attributes };
+          
+          // Filter out empty/null values from attributes
+          Object.keys(finalAttributes).forEach(key => {
+            const value = finalAttributes[key];
+            if (value === null || value === undefined || value === '' || 
+                (Array.isArray(value) && value.length === 0) ||
+                (typeof value === 'object' && Object.keys(value).length === 0)) {
+              delete finalAttributes[key];
+            }
+          });
+          
           if (finalAttributes.mainImageUrl || finalAttributes.galleryImages) {
             try {
               const productSku = productData.groupSku || productData.subSku;
@@ -317,12 +337,13 @@ class ProductController {
             groupSku: productData.groupSku,
             subSku: productData.subSku,
             category: productData.category,
-            collections: productData.collections,
+            collectionName: productData.collectionName,
             shipTypes: productData.shipTypes,
             singleSetItem: productData.singleSetItem,
             // Brand Pricing (using validated and converted values)
             brandRealPrice: brandRealPrice,
             brandMiscellaneous: brandMiscellaneous,
+            msrp: msrp,
             // Ecommerce Pricing (All default to 0 - will be set via separate API)
             shippingPrice: 0,
             commissionPrice: 0,
@@ -397,7 +418,7 @@ class ProductController {
   static async updateProduct(req, res) {
     try {
       const productId = parseInt(req.params.id);
-      const { title, groupSku, subSku, category, collections, shipTypes, singleSetItem, attributes } = req.body;
+      const { title, groupSku, subSku, category, collectionName, shipTypes, singleSetItem, attributes } = req.body;
 
       // Check if product exists
       const existingProduct = await ProductModel.findById(productId);
@@ -430,7 +451,7 @@ class ProductController {
         groupSku,
         subSku,
         category,
-        collections,
+        collectionName,
         shipTypes,
         singleSetItem,
         attributes
@@ -552,10 +573,27 @@ class ProductController {
     }
   }
 
-  // Upload product images - supports file uploads and URL downloads
+  // Upload product images - supports both JSON and Form Data uploads
   static async uploadProductImages(req, res) {
     try {
-      const { groupSku, subSku, imageUrls } = req.body;
+      console.log('🔍 Request body:', req.body);
+      console.log('🔍 Content-Type:', req.get('Content-Type'));
+      
+      let groupSku, subSku, imageUrls;
+      
+      // Handle both JSON and Form Data
+      if (req.get('Content-Type') && req.get('Content-Type').includes('application/json')) {
+        // JSON request
+        const body = req.body;
+        groupSku = body.groupSku;
+        subSku = body.subSku;
+        imageUrls = body.imageUrls;
+      } else {
+        // Form Data request
+        groupSku = req.body.groupSku;
+        subSku = req.body.subSku;
+        imageUrls = req.body.imageUrls;
+      }
       
       if (!groupSku && !subSku) {
         return res.status(400).json({
@@ -702,6 +740,252 @@ class ProductController {
       console.error('Upload product images error:', error);
       res.status(500).json({
         error: 'Failed to upload product images',
+        details: error.message
+      });
+    }
+  }
+
+  // Get simple image template - only groupSku, subSku, mainImage for products with images
+  static async getImageTemplate(req, res) {
+    try {
+      // Build where clause based on user access
+      let whereClause = {};
+      
+      // For non-admin users, filter by accessible brands
+      if (req.user.role !== 'ADMIN') {
+        const userBrands = await prisma.userBrandAccess.findMany({
+          where: {
+            userId: req.user.userId,
+            isActive: true
+          }
+        });
+        
+        const accessibleBrandIds = userBrands.map(access => access.brandId);
+        
+        if (accessibleBrandIds.length === 0) {
+          return res.status(403).json({
+            error: 'No brand access',
+            message: 'You don\'t have access to any brands'
+          });
+        }
+        
+        whereClause.brandId = { in: accessibleBrandIds };
+      }
+      
+      // Get all products
+      const products = await prisma.product.findMany({
+        where: whereClause,
+        select: {
+          groupSku: true,
+          subSku: true,
+          attributes: true
+        }
+      });
+      
+      // Separate products with and without images
+      const productsWithoutImages = [];
+      const productsWithImages = [];
+      
+      products.forEach(product => {
+        const attributes = product.attributes || {};
+        const hasMainImage = attributes.mainImageUrl && attributes.mainImageUrl.trim() !== '';
+        const hasGalleryImages = attributes.galleryImages && Array.isArray(attributes.galleryImages) && attributes.galleryImages.length > 0;
+        const hasImages = hasMainImage || hasGalleryImages;
+        
+        const productData = {
+          groupSku: product.groupSku,
+          subSku: product.subSku || '',
+          mainImage: attributes.mainImageUrl || '',
+          galleryImages: attributes.galleryImages || []
+        };
+        
+        if (hasImages) {
+          productsWithImages.push(productData);
+        } else {
+          productsWithoutImages.push(productData);
+        }
+      });
+      
+      // Combine data: products without images first, then products with images
+      const templateData = [...productsWithoutImages, ...productsWithImages];
+      
+      res.json({
+        message: 'Image template data retrieved successfully',
+        timestamp: new Date().toISOString(),
+        summary: {
+          totalProducts: products.length,
+          productsWithImages: productsWithImages.length,
+          productsWithoutImages: products.length - productsWithImages.length
+        },
+        templateData: templateData
+      });
+      
+    } catch (error) {
+      console.error('Get image template error:', error);
+      res.status(500).json({
+        error: 'Failed to get image template',
+        details: error.message
+      });
+    }
+  }
+
+  // Get product template data for Excel generation (brand-wise, with image status)
+  static async generateExcelTemplate(req, res) {
+    try {
+      // Get query parameters
+      const brandId = req.query.brandId;
+      const includeImages = req.query.includeImages === 'true';
+      
+      // Build where clause based on user access
+      let whereClause = {};
+      
+      // Filter by brand if specified
+      if (brandId) {
+        whereClause.brandId = parseInt(brandId);
+      }
+      
+      // For non-admin users, filter by accessible brands
+      if (req.user.role !== 'ADMIN') {
+        const userBrands = await prisma.userBrandAccess.findMany({
+          where: {
+            userId: req.user.userId,
+            isActive: true
+          },
+          include: { brand: true }
+        });
+        
+        const accessibleBrandIds = userBrands.map(access => access.brandId);
+        
+        if (accessibleBrandIds.length === 0) {
+          return res.status(403).json({
+            error: 'No brand access',
+            message: 'You don\'t have access to any brands'
+          });
+        }
+        
+        whereClause.brandId = { in: accessibleBrandIds };
+      }
+      
+      // Get all products with brand information
+      const products = await prisma.product.findMany({
+        where: whereClause,
+        include: {
+          brand: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        },
+        orderBy: [
+          { brand: { name: 'asc' } },
+          { title: 'asc' }
+        ]
+      });
+      
+      // Separate products with and without images
+      const productsWithoutImages = [];
+      const productsWithImages = [];
+      
+      products.forEach(product => {
+        const attributes = product.attributes || {};
+        const hasMainImage = attributes.mainImageUrl && attributes.mainImageUrl.trim() !== '';
+        const hasGalleryImages = attributes.galleryImages && Array.isArray(attributes.galleryImages) && attributes.galleryImages.length > 0;
+        const hasImages = hasMainImage || hasGalleryImages;
+        
+        const productData = {
+          brandName: product.brand.name,
+          brandId: product.brand.id,
+          title: product.title,
+          groupSku: product.groupSku,
+          subSku: product.subSku || '',
+          category: product.category || '',
+          collections: product.collections || '',
+          shipTypes: product.shipTypes || '',
+          singleSetItem: product.singleSetItem || '',
+          brandRealPrice: parseFloat(product.brandRealPrice),
+          brandMiscellaneous: parseFloat(product.brandMiscellaneous),
+          mainImage: hasMainImage ? attributes.mainImageUrl : '',
+          galleryImages: hasGalleryImages ? attributes.galleryImages.join(',') : '',
+          hasImages: hasImages,
+          imageCount: (hasMainImage ? 1 : 0) + (hasGalleryImages ? attributes.galleryImages.length : 0)
+        };
+        
+        if (hasImages) {
+          productsWithImages.push(productData);
+        } else {
+          productsWithoutImages.push(productData);
+        }
+      });
+      
+      // Combine data: products without images first, then products with images
+      const templateData = [...productsWithoutImages, ...productsWithImages];
+      
+      // Group by brand for better organization
+      const brandGroups = {};
+      templateData.forEach(product => {
+        if (!brandGroups[product.brandName]) {
+          brandGroups[product.brandName] = {
+            brandId: product.brandId,
+            brandName: product.brandName,
+            products: [],
+            withoutImages: 0,
+            withImages: 0,
+            totalImages: 0
+          };
+        }
+        
+        brandGroups[product.brandName].products.push(product);
+        
+        if (product.hasImages) {
+          brandGroups[product.brandName].withImages++;
+          brandGroups[product.brandName].totalImages += product.imageCount;
+        } else {
+          brandGroups[product.brandName].withoutImages++;
+        }
+      });
+      
+      // Calculate summary statistics
+      const summary = {
+        totalProducts: products.length,
+        totalBrands: Object.keys(brandGroups).length,
+        productsWithoutImages: productsWithoutImages.length,
+        productsWithImages: productsWithImages.length,
+        totalImages: productsWithImages.reduce((sum, product) => sum + product.imageCount, 0),
+        averageImagesPerProduct: productsWithImages.length > 0 ? 
+          (productsWithImages.reduce((sum, product) => sum + product.imageCount, 0) / productsWithImages.length).toFixed(2) : 0
+      };
+      
+      // Return JSON data for frontend Excel generation
+      res.json({
+        message: 'Product template data retrieved successfully',
+        timestamp: new Date().toISOString(),
+        summary: summary,
+        brandGroups: brandGroups,
+        templateData: templateData,
+        excelColumns: [
+          { key: 'brandName', header: 'Brand Name', width: 20 },
+          { key: 'brandId', header: 'Brand ID', width: 10 },
+          { key: 'title', header: 'Title', width: 30 },
+          { key: 'groupSku', header: 'Group SKU', width: 20 },
+          { key: 'subSku', header: 'Sub SKU', width: 20 },
+          { key: 'category', header: 'Category', width: 15 },
+          { key: 'collections', header: 'Collections', width: 15 },
+          { key: 'shipTypes', header: 'Ship Types', width: 15 },
+          { key: 'singleSetItem', header: 'Single Set Item', width: 15 },
+          { key: 'brandRealPrice', header: 'Brand Real Price', width: 15 },
+          { key: 'brandMiscellaneous', header: 'Brand Miscellaneous', width: 20 },
+          { key: 'mainImage', header: 'Main Image URL', width: 30 },
+          { key: 'galleryImages', header: 'Gallery Images (Comma Separated)', width: 40 },
+          { key: 'hasImages', header: 'Has Images', width: 12 },
+          { key: 'imageCount', header: 'Image Count', width: 12 }
+        ]
+      });
+      
+    } catch (error) {
+      console.error('Generate Excel template error:', error);
+      res.status(500).json({
+        error: 'Failed to generate Excel template',
         details: error.message
       });
     }
