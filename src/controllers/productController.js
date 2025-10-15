@@ -295,16 +295,8 @@ class ProductController {
             continue;
           }
 
-          // Process attributes (including images if provided)
+          // Process attributes (clean up empty values)
           let finalAttributes = { ...productData.attributes };
-          
-          // Add mainImageUrl and galleryImages if provided in request
-          if (productData.mainImageUrl) {
-            finalAttributes.mainImageUrl = productData.mainImageUrl;
-          }
-          if (productData.galleryImages && Array.isArray(productData.galleryImages)) {
-            finalAttributes.galleryImages = productData.galleryImages;
-          }
           
           // Filter out empty/null values from attributes
           Object.keys(finalAttributes).forEach(key => {
@@ -339,6 +331,9 @@ class ProductController {
             profitMarginPrice: productData.profitMarginPrice || 0,
             ecommerceMiscellaneous: productData.ecommerceMiscellaneous || 0,
             ecommercePrice: productData.ecommercePrice || 0,
+            // Image columns (optional during creation)
+            mainImageUrl: productData.mainImageUrl || null,
+            galleryImages: productData.galleryImages || null,
             attributes: finalAttributes
           });
 

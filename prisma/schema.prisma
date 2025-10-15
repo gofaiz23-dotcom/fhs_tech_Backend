@@ -362,6 +362,10 @@ model Product {
   ecommerceMiscellaneous Decimal @map("ecommerce_miscellaneous") @db.Decimal(10,2)
   ecommercePrice      Decimal @map("ecommerce_price") @db.Decimal(10,2)
   
+  // Image Columns (Optional)
+  mainImageUrl        String? @map("main_image_url") // Main product image URL
+  galleryImages       Json?   @map("gallery_images") // Array of gallery image URLs
+  
   attributes  Json     // All extra data in JSONB format
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
