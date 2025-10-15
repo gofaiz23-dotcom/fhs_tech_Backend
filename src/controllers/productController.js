@@ -295,8 +295,16 @@ class ProductController {
             continue;
           }
 
-          // Process attributes (without image processing during product creation)
+          // Process attributes (including images if provided)
           let finalAttributes = { ...productData.attributes };
+          
+          // Add mainImageUrl and galleryImages if provided in request
+          if (productData.mainImageUrl) {
+            finalAttributes.mainImageUrl = productData.mainImageUrl;
+          }
+          if (productData.galleryImages && Array.isArray(productData.galleryImages)) {
+            finalAttributes.galleryImages = productData.galleryImages;
+          }
           
           // Filter out empty/null values from attributes
           Object.keys(finalAttributes).forEach(key => {
@@ -325,11 +333,12 @@ class ProductController {
             brandRealPrice: brandRealPrice,
             brandMiscellaneous: brandMiscellaneous,
             msrp: msrp,
-            // Ecommerce Pricing (All default to 0 - will be set via separate API)
-            shippingPrice: 0,
-            commissionPrice: 0,
-            profitMarginPrice: 0,
-            ecommerceMiscellaneous: 0,
+            // Ecommerce Pricing (from request or default to 0)
+            shippingPrice: productData.shippingPrice || 0,
+            commissionPrice: productData.commissionPrice || 0,
+            profitMarginPrice: productData.profitMarginPrice || 0,
+            ecommerceMiscellaneous: productData.ecommerceMiscellaneous || 0,
+            ecommercePrice: productData.ecommercePrice || 0,
             attributes: finalAttributes
           });
 
