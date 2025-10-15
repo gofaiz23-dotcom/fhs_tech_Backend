@@ -236,6 +236,8 @@ class ProductController {
           
           console.log('🔍 Extracted MSRP (case-insensitive):', msrp, 'Type:', typeof msrp);
           console.log('🔍 Available fields in request:', Object.keys(req.body));
+          console.log('🔍 MSRP field found:', ProductController.normalizeFieldName(req.body, 'msrp'));
+          console.log('🔍 Raw MSRP value from request:', req.body.msrp, req.body.MSRP, req.body.Msrp);
           
           productsToCreate = [{
             brandId: brandId,
@@ -329,7 +331,7 @@ class ProductController {
           }
 
           // Validate and convert price values
-          let brandRealPrice, brandMiscellaneous, msrp;
+          let brandRealPrice, brandMiscellaneous, msrp = null;
           
           console.log('🔍 Price Validation Debug:', {
             title: productData.title,
@@ -340,7 +342,9 @@ class ProductController {
             msrp: productData.msrp,
             msrpType: typeof productData.msrp,
             allFields: Object.keys(productData),
-            msrpFieldFound: ProductController.normalizeFieldName(productData, 'msrp') !== null
+            msrpFieldFound: ProductController.normalizeFieldName(productData, 'msrp') !== null,
+            msrpFieldName: ProductController.normalizeFieldName(productData, 'msrp'),
+            msrpValueFromGetField: ProductController.getFieldValue(productData, 'msrp')
           });
           
           try {
@@ -397,6 +401,15 @@ class ProductController {
 
           // Note: Images are processed separately after product creation
           // This allows products to be created first, then images uploaded later
+
+          // Check if msrp was successfully validated
+          if (msrp === null) {
+            results.errors.push({
+              title: productData.title,
+              error: 'MSRP validation failed'
+            });
+            continue;
+          }
 
           // Create product
           console.log('📝 Creating product with data:', {
