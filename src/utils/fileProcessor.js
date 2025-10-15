@@ -17,6 +17,7 @@ class FileProcessor {
       .replace(/_+/g, '_')       // Replace multiple underscores with single underscore
       .replace(/^_|_$/g, '');    // Remove leading/trailing underscores
     
+    
     // Handle specific field mappings
     const fieldMappings = {
       // Group SKU variations
@@ -208,6 +209,7 @@ class FileProcessor {
       const rows = data.slice(1);
       
       
+      
       // Convert to objects
       const result = rows.map((row, rowIndex) => {
         const obj = {};
@@ -231,6 +233,7 @@ class FileProcessor {
             }
           }
         });
+        
         
         return obj;
       }).filter(obj => {
@@ -516,9 +519,9 @@ class FileProcessor {
         shipTypes: item.shipTypes ? item.shipTypes.trim() : '',
         singleSetItem: item.singleSetItem ? item.singleSetItem.trim() : '',
         // Brand Pricing (brandRealPrice and msrp are mandatory, others default to 0)
-        brandRealPrice: parseFloat(item.brandRealPrice),
-        brandMiscellaneous: parseFloat(item.brandMiscellaneous) || 0,
-        msrp: parseFloat(item.msrp),
+        brandRealPrice: item.brandRealPrice !== undefined && item.brandRealPrice !== null && item.brandRealPrice !== '' ? parseFloat(item.brandRealPrice) : undefined,
+        brandMiscellaneous: item.brandMiscellaneous !== undefined && item.brandMiscellaneous !== null && item.brandMiscellaneous !== '' ? parseFloat(item.brandMiscellaneous) : 0,
+        msrp: item.msrp !== undefined && item.msrp !== null && item.msrp !== '' ? parseFloat(item.msrp) : undefined,
         // Ecommerce Pricing (All default to 0 - will be set via separate API)
         shippingPrice: 0,
         commissionPrice: 0,

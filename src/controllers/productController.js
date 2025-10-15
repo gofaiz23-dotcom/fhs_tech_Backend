@@ -265,7 +265,10 @@ class ProductController {
             console.log('✅ Brand Real Price validation result:', brandRealPrice);
             
             if (brandRealPrice === null) {
-              results.errors.push(`Product "${productData.title}": Brand Real Price is mandatory`);
+              results.errors.push({
+                title: productData.title,
+                error: 'Brand Real Price is mandatory'
+              });
               continue;
             }
             
@@ -277,7 +280,10 @@ class ProductController {
             console.log('✅ MSRP validation result:', msrp);
             
             if (msrp === null) {
-              results.errors.push(`Product "${productData.title}": MSRP is mandatory`);
+              results.errors.push({
+                title: productData.title,
+                error: 'msrp is not defined'
+              });
               continue;
             }
           } catch (error) {
