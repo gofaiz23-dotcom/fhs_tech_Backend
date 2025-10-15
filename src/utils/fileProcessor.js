@@ -205,8 +205,12 @@ class FileProcessor {
       }
       
       // First row is headers, rest is data
-      const headers = data[0].map(header => FileProcessor.normalizeHeader(String(header).trim()));
+      const originalHeaders = data[0].map(header => String(header).trim());
+      const headers = originalHeaders.map(header => FileProcessor.normalizeHeader(header));
       const rows = data.slice(1);
+      
+      console.log('📋 Original Excel headers:', originalHeaders);
+      console.log('📋 Normalized headers:', headers);
       
       
       

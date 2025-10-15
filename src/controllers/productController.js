@@ -257,7 +257,10 @@ class ProductController {
             brandRealPrice: productData.brandRealPrice,
             brandRealPriceType: typeof productData.brandRealPrice,
             brandMiscellaneous: productData.brandMiscellaneous,
-            brandMiscellaneousType: typeof productData.brandMiscellaneous
+            brandMiscellaneousType: typeof productData.brandMiscellaneous,
+            msrp: productData.msrp,
+            msrpType: typeof productData.msrp,
+            allFields: Object.keys(productData)
           });
           
           try {
