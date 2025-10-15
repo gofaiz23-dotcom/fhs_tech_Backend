@@ -41,21 +41,28 @@ class ImageService {
           return;
         }
 
-        // Generate unique filename with collision detection
+        // Generate unique filename with enhanced collision detection
         let filename, filePath;
         let attempts = 0;
         const maxAttempts = 10;
+        const timestamp = Date.now();
+        const random = Math.round(Math.random() * 1E9);
         
         do {
           const uuid = uuidv4();
-          filename = `dl_${uuid}${fileExtension}`;
+          // Triple uniqueness: UUID + timestamp + random number
+          filename = `dl_${uuid}_${timestamp}_${random}${fileExtension}`;
           filePath = path.join(imagesDir, filename);
           attempts++;
         } while (fs.existsSync(filePath) && attempts < maxAttempts);
         
         if (attempts >= maxAttempts) {
-          reject(new Error('Failed to generate unique filename after multiple attempts'));
-          return;
+          // Ultimate fallback with process ID and additional randomness
+          const processId = process.pid;
+          const additionalRandom = Math.round(Math.random() * 1E12);
+          filename = `dl_${timestamp}_${processId}_${additionalRandom}${fileExtension}`;
+          filePath = path.join(imagesDir, filename);
+          console.log(`⚠️ Used fallback filename generation for downloaded image: ${filename}`);
         }
         console.log(`💾 Saving to: ${filePath}`);
 

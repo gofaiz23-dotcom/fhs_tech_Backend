@@ -40,24 +40,29 @@ const storage = multer.diskStorage({
 // Helper function to generate unique filename with collision detection
 const generateUniqueFilename = (fieldname, originalname) => {
   const fileExtension = path.extname(originalname);
+  const timestamp = Date.now();
+  const random = Math.round(Math.random() * 1E9);
   let filename, filePath;
   let attempts = 0;
   const maxAttempts = 10;
   
   do {
     const uuid = uuidv4();
-    filename = `${fieldname}_${uuid}${fileExtension}`;
+    // Triple uniqueness: UUID + timestamp + random number
+    filename = `${fieldname}_${uuid}_${timestamp}_${random}${fileExtension}`;
     filePath = path.join(imagesDir, filename);
     attempts++;
   } while (fs.existsSync(filePath) && attempts < maxAttempts);
   
   if (attempts >= maxAttempts) {
-    // Fallback to timestamp-based naming if UUID fails
-    const timestamp = Date.now();
-    const random = Math.round(Math.random() * 1E9);
-    filename = `${fieldname}_${timestamp}_${random}${fileExtension}`;
+    // Ultimate fallback with process ID and additional randomness
+    const processId = process.pid;
+    const additionalRandom = Math.round(Math.random() * 1E12);
+    filename = `${fieldname}_${timestamp}_${processId}_${additionalRandom}${fileExtension}`;
+    console.log(`⚠️ Used fallback filename generation for: ${originalname}`);
   }
   
+  console.log(`📁 Generated unique filename: ${filename} for: ${originalname}`);
   return filename;
 };
 
@@ -127,16 +132,27 @@ const upload = multer({
   }
 });
 
+// Helper function for file uploads (Excel/CSV) with enhanced uniqueness
+const generateUniqueFileFilename = (fieldname, originalname) => {
+  const fileExtension = path.extname(originalname);
+  const timestamp = Date.now();
+  const random = Math.round(Math.random() * 1E9);
+  const uuid = uuidv4();
+  
+  // Quadruple uniqueness: UUID + timestamp + random + process ID
+  const fileName = `${fieldname}_${uuid}_${timestamp}_${random}_${process.pid}${fileExtension}`;
+  
+  console.log(`📄 Generated unique file filename: ${fileName} for: ${originalname}`);
+  return fileName;
+};
+
 // Configure multer for disk storage with memory buffer (hybrid approach)
 const hybridStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    // Generate unique filename with UUID to prevent conflicts
-    const uuid = uuidv4();
-    const fileExtension = path.extname(file.originalname);
-    const fileName = `${file.fieldname}_${uuid}${fileExtension}`;
+    const fileName = generateUniqueFileFilename(file.fieldname, file.originalname);
     cb(null, fileName);
   }
 });

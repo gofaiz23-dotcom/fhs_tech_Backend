@@ -58,8 +58,15 @@ class FileProcessor {
       'base_price': 'brandRealPrice',
       'baseprice': 'brandRealPrice',
       
-      // MSRP variations
+      // MSRP variations - handle all case combinations
       'msrp': 'msrp',
+      'MSRP': 'msrp',
+      'Msrp': 'msrp',
+      'MSrp': 'msrp',
+      'mSRP': 'msrp',
+      'MsRP': 'msrp',
+      'MSrP': 'msrp',
+      'mSrP': 'msrp',
       'manufacturer_suggested_retail_price': 'msrp',
       'suggested_price': 'msrp',
       'manufacturer_suggested_retail': 'msrp',
