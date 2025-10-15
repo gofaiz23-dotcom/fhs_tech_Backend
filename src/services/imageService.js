@@ -3,6 +3,7 @@ import path from 'path';
 import https from 'https';
 import http from 'http';
 import { fileURLToPath } from 'url';
+import { v4 as uuidv4 } from 'uuid';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,22 +21,42 @@ class ImageService {
 
         console.log(`🖼️ Starting download: ${imageUrl} for product: ${productSku}`);
 
-        // Create filename with better naming
+        // Create filename with UUID-based unique naming to prevent conflicts
         const urlParts = imageUrl.split('/');
         const originalFilename = urlParts[urlParts.length - 1];
         const fileExtension = path.extname(originalFilename) || '.jpg';
-        const timestamp = Date.now();
-        const random = Math.round(Math.random() * 1E9);
-        const filename = `${productSku}_${timestamp}_${random}${fileExtension}`;
         
-        // Create images directory if not exists
+        // Create images directory if not exists with proper permissions
         const imagesDir = path.join(__dirname, '../../uploads/images');
         if (!fs.existsSync(imagesDir)) {
-          fs.mkdirSync(imagesDir, { recursive: true });
+          fs.mkdirSync(imagesDir, { recursive: true, mode: 0o755 });
           console.log(`📁 Created images directory: ${imagesDir}`);
         }
+        
+        // Ensure directory is writable
+        try {
+          fs.accessSync(imagesDir, fs.constants.W_OK);
+        } catch (error) {
+          reject(new Error(`Images directory is not writable: ${imagesDir}`));
+          return;
+        }
 
-        const filePath = path.join(imagesDir, filename);
+        // Generate unique filename with collision detection
+        let filename, filePath;
+        let attempts = 0;
+        const maxAttempts = 10;
+        
+        do {
+          const uuid = uuidv4();
+          filename = `dl_${uuid}${fileExtension}`;
+          filePath = path.join(imagesDir, filename);
+          attempts++;
+        } while (fs.existsSync(filePath) && attempts < maxAttempts);
+        
+        if (attempts >= maxAttempts) {
+          reject(new Error('Failed to generate unique filename after multiple attempts'));
+          return;
+        }
         console.log(`💾 Saving to: ${filePath}`);
 
         // Choose protocol
@@ -60,25 +81,40 @@ class ImageService {
             file.close();
             console.log(`✅ Successfully downloaded: ${filename}`);
             
-            // Verify file exists and has content
-            if (fs.existsSync(filePath)) {
-              const stats = fs.statSync(filePath);
-              if (stats.size > 0) {
-                resolve({
-                  success: true,
-                  localPath: filePath,
-                  filename: filename,
-                  url: `/uploads/images/${filename}`,
-                  originalUrl: imageUrl,
-                  size: stats.size
-                });
+            // Wait a moment for file system to sync
+            setTimeout(() => {
+              // Verify file exists and has content
+              if (fs.existsSync(filePath)) {
+                const stats = fs.statSync(filePath);
+                if (stats.size > 0) {
+                  console.log(`🔍 File verified: ${filename} (${stats.size} bytes) at ${filePath}`);
+                  
+                  // Set proper file permissions for permanent storage
+                  try {
+                    fs.chmodSync(filePath, 0o644);
+                  } catch (permError) {
+                    console.warn(`⚠️ Could not set file permissions: ${permError.message}`);
+                  }
+                  
+                  resolve({
+                    success: true,
+                    localPath: filePath,
+                    filename: filename,
+                    url: `/uploads/images/${filename}`,
+                    originalUrl: imageUrl,
+                    size: stats.size,
+                    permanent: true // Flag to indicate this is permanent storage
+                  });
+                } else {
+                  console.error(`❌ Downloaded file is empty: ${filename}`);
+                  fs.unlink(filePath, () => {});
+                  reject(new Error('Downloaded file is empty'));
+                }
               } else {
-                fs.unlink(filePath, () => {});
-                reject(new Error('Downloaded file is empty'));
+                console.error(`❌ File was not created: ${filePath}`);
+                reject(new Error('File was not created'));
               }
-            } else {
-              reject(new Error('File was not created'));
-            }
+            }, 100); // Small delay to ensure file system sync
           });
 
           file.on('error', (err) => {
@@ -210,13 +246,55 @@ class ImageService {
     try {
       const imagesDir = path.join(__dirname, '../../uploads/images');
       if (!fs.existsSync(imagesDir)) {
-        fs.mkdirSync(imagesDir, { recursive: true });
+        fs.mkdirSync(imagesDir, { recursive: true, mode: 0o755 });
         console.log(`📁 Created images directory: ${imagesDir}`);
       }
       return imagesDir;
     } catch (error) {
       console.error('Error creating directory:', error);
       throw error;
+    }
+  }
+
+  // Verify image persistence - check if image files still exist
+  static verifyImagePersistence(productSku) {
+    try {
+      const imagesDir = path.join(__dirname, '../../uploads/images');
+      if (!fs.existsSync(imagesDir)) {
+        return { exists: false, error: 'Images directory does not exist' };
+      }
+
+      const files = fs.readdirSync(imagesDir);
+      const productImages = files.filter(file => 
+        file.startsWith(`${productSku}_`) || 
+        file.startsWith('img_') || 
+        file.startsWith('dl_')
+      );
+      
+      const verificationResults = productImages.map(filename => {
+        const filePath = path.join(imagesDir, filename);
+        const exists = fs.existsSync(filePath);
+        const stats = exists ? fs.statSync(filePath) : null;
+        
+        return {
+          filename,
+          exists,
+          size: stats ? stats.size : 0,
+          modified: stats ? stats.mtime : null,
+          url: `/uploads/images/${filename}`
+        };
+      });
+
+      return {
+        exists: true,
+        productSku,
+        totalImages: productImages.length,
+        images: verificationResults,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error verifying image persistence:', error);
+      return { exists: false, error: error.message };
     }
   }
 }

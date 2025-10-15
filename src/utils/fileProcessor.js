@@ -24,17 +24,24 @@ class FileProcessor {
       'group_sk_u': 'groupSku',
       'groupsku': 'groupSku',
       'group': 'groupSku',
+      'sku': 'groupSku',
+      'product_sku': 'groupSku',
+      'productsku': 'groupSku',
       
       // Sub SKU variations
       'sub_sku': 'subSku',
       'sub_sk_u': 'subSku',
       'subsku': 'subSku',
       'sub': 'subSku',
+      'variant_sku': 'subSku',
+      'variantsku': 'subSku',
       
       // Brand Name variations
       'brand_name': 'brandName',
       'brandname': 'brandName',
       'brand': 'brandName',
+      'manufacturer': 'brandName',
+      'company': 'brandName',
       
       // Brand Real Price variations
       'brand_real_price': 'brandRealPrice',
@@ -43,11 +50,25 @@ class FileProcessor {
       'brandprice': 'brandRealPrice',
       'real_price': 'brandRealPrice',
       'realprice': 'brandRealPrice',
+      'cost_price': 'brandRealPrice',
+      'costprice': 'brandRealPrice',
+      'wholesale_price': 'brandRealPrice',
+      'wholesaleprice': 'brandRealPrice',
+      'base_price': 'brandRealPrice',
+      'baseprice': 'brandRealPrice',
       
       // MSRP variations
       'msrp': 'msrp',
       'manufacturer_suggested_retail_price': 'msrp',
       'suggested_price': 'msrp',
+      'manufacturer_suggested_retail': 'msrp',
+      'retail_price': 'msrp',
+      'manufacturer_price': 'msrp',
+      'list_price': 'msrp',
+      'suggested_retail_price': 'msrp',
+      'suggestedretailprice': 'msrp',
+      'retail': 'msrp',
+      'price': 'msrp',
       
       // Brand Miscellaneous variations
       'brand_miscellaneous': 'brandMiscellaneous',
@@ -60,6 +81,8 @@ class FileProcessor {
       'collectionname': 'collectionName',
       'collection': 'collectionName',
       'collections': 'collectionName',
+      'series': 'collectionName',
+      'line': 'collectionName',
       
       // Ship Types variations
       'ship_types': 'shipTypes',
@@ -67,6 +90,8 @@ class FileProcessor {
       'shipping_types': 'shipTypes',
       'shippingtypes': 'shipTypes',
       'ship': 'shipTypes',
+      'shipping': 'shipTypes',
+      'delivery': 'shipTypes',
       
       // Single Set Item variations
       'single_set_item': 'singleSetItem',
@@ -76,6 +101,28 @@ class FileProcessor {
       'singleset': 'singleSetItem',
       'set_item': 'singleSetItem',
       'setitem': 'singleSetItem',
+      'item_type': 'singleSetItem',
+      'itemtype': 'singleSetItem',
+      'type': 'singleSetItem',
+      
+      // Title variations
+      'title': 'title',
+      'product_title': 'title',
+      'producttitle': 'title',
+      'name': 'title',
+      'product_name': 'title',
+      'productname': 'title',
+      'description': 'title',
+      'product_description': 'title',
+      'productdescription': 'title',
+      
+      // Category variations
+      'category': 'category',
+      'product_category': 'category',
+      'productcategory': 'category',
+      'cat': 'category',
+      'class': 'category',
+      'classification': 'category',
       
       // Main Image URL variations
       'main_image_url': 'mainImageUrl',
@@ -85,6 +132,8 @@ class FileProcessor {
       'mainimage': 'mainImageUrl',
       'image_url': 'mainImageUrl',
       'imageurl': 'mainImageUrl',
+      'primary_image': 'mainImageUrl',
+      'primaryimage': 'mainImageUrl',
       
       // Gallery Images variations
       'gallery_images': 'galleryImages',
@@ -96,7 +145,19 @@ class FileProcessor {
     };
     
     // Return mapped field or original normalized name
-    return fieldMappings[normalized] || normalized;
+    if (fieldMappings[normalized]) {
+      return fieldMappings[normalized];
+    }
+    
+    // Fallback: try case-insensitive matching for common fields
+    const lowerNormalized = normalized.toLowerCase();
+    for (const [key, value] of Object.entries(fieldMappings)) {
+      if (key.toLowerCase() === lowerNormalized) {
+        return value;
+      }
+    }
+    
+    return normalized;
   }
 
   // Process Excel file from buffer (.xlsx, .xls)
@@ -146,16 +207,35 @@ class FileProcessor {
       const headers = data[0].map(header => FileProcessor.normalizeHeader(String(header).trim()));
       const rows = data.slice(1);
       
+      
       // Convert to objects
-      const result = rows.map(row => {
+      const result = rows.map((row, rowIndex) => {
         const obj = {};
         headers.forEach((header, index) => {
-          obj[header] = row[index] ? String(row[index]).trim() : '';
+          const value = row[index];
+          if (value === null || value === undefined) {
+            obj[header] = '';
+          } else {
+            // Handle numeric values (prices, quantities, etc.)
+            if (typeof value === 'number') {
+              obj[header] = value;
+            } else {
+              // Handle string values
+              const stringValue = String(value).trim();
+              // Try to convert to number if it looks like a number
+              if (stringValue !== '' && !isNaN(stringValue) && !isNaN(parseFloat(stringValue))) {
+                obj[header] = parseFloat(stringValue);
+              } else {
+                obj[header] = stringValue;
+              }
+            }
+          }
         });
+        
         return obj;
       }).filter(obj => {
         // Filter out empty rows
-        return Object.values(obj).some(value => value !== '');
+        return Object.values(obj).some(value => value !== '' && value !== null && value !== undefined);
       });
       
       return result;
@@ -188,9 +268,19 @@ class FileProcessor {
             let hasData = false;
             
             Object.keys(data).forEach(key => {
-              const value = String(data[key]).trim();
-              cleanData[key] = value;
-              if (value !== '') hasData = true;
+              const value = data[key];
+              if (value === null || value === undefined) {
+                cleanData[key] = '';
+              } else {
+                const stringValue = String(value).trim();
+                // Try to convert to number if it looks like a number
+                if (stringValue !== '' && !isNaN(stringValue) && !isNaN(parseFloat(stringValue))) {
+                  cleanData[key] = parseFloat(stringValue);
+                } else {
+                  cleanData[key] = stringValue;
+                }
+                if (cleanData[key] !== '') hasData = true;
+              }
             });
             
             if (hasData) {
@@ -355,14 +445,16 @@ class FileProcessor {
         return;
       }
 
-      // Brand Real Price is mandatory
-      if (item.brandRealPrice === undefined || item.brandRealPrice === null || item.brandRealPrice === '') {
+      // Brand Real Price is mandatory - accept decimal values like 59.00
+      const brandRealPriceValue = item.brandRealPrice;
+      if (brandRealPriceValue === undefined || brandRealPriceValue === null || brandRealPriceValue === '') {
         errors.push(`Row ${row}: Brand Real Price is mandatory`);
         return;
       }
       
-      // MSRP is mandatory
-      if (item.msrp === undefined || item.msrp === null || item.msrp === '') {
+      // MSRP is mandatory - accept decimal values like 59.00
+      const msrpValue = item.msrp;
+      if (msrpValue === undefined || msrpValue === null || msrpValue === '') {
         errors.push(`Row ${row}: MSRP is mandatory`);
         return;
       }

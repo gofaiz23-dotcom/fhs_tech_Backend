@@ -2,6 +2,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { v4 as uuidv4 } from 'uuid';
 
 // Get current directory
 const __filename = fileURLToPath(import.meta.url);
@@ -36,15 +37,41 @@ const storage = multer.diskStorage({
   }
 });
 
-// Configure multer for image storage
+// Helper function to generate unique filename with collision detection
+const generateUniqueFilename = (fieldname, originalname) => {
+  const fileExtension = path.extname(originalname);
+  let filename, filePath;
+  let attempts = 0;
+  const maxAttempts = 10;
+  
+  do {
+    const uuid = uuidv4();
+    filename = `${fieldname}_${uuid}${fileExtension}`;
+    filePath = path.join(imagesDir, filename);
+    attempts++;
+  } while (fs.existsSync(filePath) && attempts < maxAttempts);
+  
+  if (attempts >= maxAttempts) {
+    // Fallback to timestamp-based naming if UUID fails
+    const timestamp = Date.now();
+    const random = Math.round(Math.random() * 1E9);
+    filename = `${fieldname}_${timestamp}_${random}${fileExtension}`;
+  }
+  
+  return filename;
+};
+
+// Configure multer for image storage with UUID-based unique naming
 const imageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
+    // Ensure directory exists with proper permissions
+    if (!fs.existsSync(imagesDir)) {
+      fs.mkdirSync(imagesDir, { recursive: true, mode: 0o755 });
+    }
     cb(null, imagesDir);
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const fileExtension = path.extname(file.originalname);
-    const fileName = file.fieldname + '-' + uniqueSuffix + fileExtension;
+    const fileName = generateUniqueFilename(file.fieldname, file.originalname);
     cb(null, fileName);
   }
 });
@@ -106,10 +133,10 @@ const hybridStorage = multer.diskStorage({
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    // Generate unique filename with timestamp
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    // Generate unique filename with UUID to prevent conflicts
+    const uuid = uuidv4();
     const fileExtension = path.extname(file.originalname);
-    const fileName = file.fieldname + '-' + uniqueSuffix + fileExtension;
+    const fileName = `${file.fieldname}_${uuid}${fileExtension}`;
     cb(null, fileName);
   }
 });

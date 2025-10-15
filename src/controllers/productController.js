@@ -584,6 +584,16 @@ class ProductController {
         });
       }
 
+      // Find the product for image tracking
+      let existingProduct;
+      if (productId) {
+        existingProduct = await ProductModel.findById(parseInt(productId));
+      } else if (subSku) {
+        existingProduct = await ProductModel.findBySubSku(subSku);
+      } else if (groupSku) {
+        existingProduct = await ProductModel.findByGroupSku(groupSku);
+      }
+
       let results = {
         uploadedFiles: [],
         downloadedUrls: [],
@@ -596,14 +606,51 @@ class ProductController {
         
         for (const file of req.files) {
           try {
-            results.uploadedFiles.push({
-              originalName: file.originalname,
-              filename: file.filename,
-              path: file.path,
-              url: `/uploads/images/${file.filename}`,
-              size: file.size
-            });
+            // Verify file exists and is accessible
+            const fs = await import('fs');
+            if (fs.existsSync(file.path)) {
+              const stats = fs.statSync(file.path);
+              console.log(`🔍 Uploaded file verified: ${file.filename} (${stats.size} bytes) at ${file.path}`);
+              
+              const uploadedFile = {
+                originalName: file.originalname,
+                filename: file.filename,
+                path: file.path,
+                url: `/uploads/images/${file.filename}`,
+                size: file.size,
+                permanent: true // Flag to indicate permanent storage
+              };
+              
+              results.uploadedFiles.push(uploadedFile);
+              
+              // Track uploaded files in product attributes
+              if (existingProduct) {
+                const currentAttributes = existingProduct.attributes || {};
+                const existingImages = currentAttributes.images || [];
+                
+                const newImage = {
+                  type: 'uploaded',
+                  originalName: file.originalname,
+                  filename: file.filename,
+                  url: uploadedFile.url,
+                  uploadedAt: new Date().toISOString(),
+                  permanent: true
+                };
+                
+                currentAttributes.images = [...existingImages, newImage];
+                
+                // Update product with image tracking information
+                await ProductModel.update(existingProduct.id, {
+                  attributes: currentAttributes
+                });
+                
+                console.log(`📝 Tracked uploaded file: ${file.filename} for product ${existingProduct.id}`);
+              }
+            } else {
+              throw new Error(`File not found after upload: ${file.path}`);
+            }
           } catch (error) {
+            console.error(`❌ File verification failed: ${file.originalname}`, error);
             results.failed.push({
               type: 'file',
               name: file.originalname,
@@ -629,7 +676,8 @@ class ProductController {
             originalUrl: item.originalUrl,
             filename: item.filename,
             url: item.url,
-            localPath: item.localPath
+            localPath: item.localPath,
+            permanent: true // Flag to indicate permanent storage
           }));
           
           results.failed = results.failed.concat(downloadResults.failed.map(item => ({
@@ -637,6 +685,30 @@ class ProductController {
             url: item.originalUrl,
             error: item.error
           })));
+          
+          // Store image information in product attributes for tracking
+          if (downloadResults.successful.length > 0 && existingProduct) {
+            const currentAttributes = existingProduct.attributes || {};
+            const existingImages = currentAttributes.images || [];
+            
+            const newImages = downloadResults.successful.map(item => ({
+              type: 'downloaded',
+              originalUrl: item.originalUrl,
+              filename: item.filename,
+              url: item.url,
+              uploadedAt: new Date().toISOString(),
+              permanent: true
+            }));
+            
+            currentAttributes.images = [...existingImages, ...newImages];
+            
+            // Update product with image tracking information
+            await ProductModel.update(existingProduct.id, {
+              attributes: currentAttributes
+            });
+            
+            console.log(`📝 Updated product ${existingProduct.id} with ${newImages.length} new images`);
+          }
           
         } catch (error) {
           results.failed.push({
