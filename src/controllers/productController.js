@@ -276,16 +276,16 @@ class ProductController {
             console.log('✅ Brand Miscellaneous validation result:', brandMiscellaneous);
             
             // Validate MSRP
-            const msrp = ProductController.validatePrice(productData.msrp, 'MSRP');
-            console.log('✅ MSRP validation result:', msrp);
-            
-            if (msrp === null) {
+            if (productData.msrp === undefined || productData.msrp === null || productData.msrp === '') {
               results.errors.push({
                 title: productData.title,
-                error: 'msrp is not defined'
+                error: 'MSRP is mandatory'
               });
               continue;
             }
+            
+            const msrp = ProductController.validatePrice(productData.msrp, 'MSRP');
+            console.log('✅ MSRP validation result:', msrp);
           } catch (error) {
             console.error('❌ Price validation error:', error.message);
             results.errors.push(`Product "${productData.title}": ${error.message}`);
