@@ -5,6 +5,31 @@ import queueService from '../services/queueService.js';
 import { prisma } from '../config/database.js';
 
 class ProductController {
+  // Helper method to normalize field names (case-insensitive)
+  static normalizeFieldName(obj, fieldName) {
+    const lowerFieldName = fieldName.toLowerCase();
+    
+    // Check for exact match first
+    if (obj.hasOwnProperty(fieldName)) {
+      return fieldName;
+    }
+    
+    // Check for case-insensitive match
+    for (const key in obj) {
+      if (key.toLowerCase() === lowerFieldName) {
+        return key;
+      }
+    }
+    
+    return null;
+  }
+
+  // Helper method to get field value with case-insensitive lookup
+  static getFieldValue(obj, fieldName) {
+    const actualKey = ProductController.normalizeFieldName(obj, fieldName);
+    return actualKey ? obj[actualKey] : undefined;
+  }
+
   // Helper method for validating and converting price values
   static validatePrice(value, fieldName) {
     // Handle null/undefined/empty
@@ -12,20 +37,34 @@ class ProductController {
       return null;
     }
     
-    // Convert to string first to handle all types, then trim
-    const valueStr = String(value).trim();
+    // Handle different data types
+    let numericValue;
     
-    // If empty after trimming, return null
-    if (valueStr === '') {
-      return null;
+    if (typeof value === 'number') {
+      // Already a number
+      numericValue = value;
+    } else if (typeof value === 'string') {
+      // String - trim and parse
+      const valueStr = value.trim();
+      if (valueStr === '') {
+        return null;
+      }
+      numericValue = parseFloat(valueStr);
+    } else if (typeof value === 'boolean') {
+      // Boolean - convert to number
+      numericValue = value ? 1 : 0;
+    } else {
+      // Try to convert to string first, then parse
+      const valueStr = String(value).trim();
+      if (valueStr === '') {
+        return null;
+      }
+      numericValue = parseFloat(valueStr);
     }
-    
-    // Try to parse as float
-    const numericValue = parseFloat(valueStr);
     
     // Check if it's a valid number and not negative
     if (isNaN(numericValue) || numericValue < 0) {
-      throw new Error(`Invalid ${fieldName}: "${value}" - must be a valid positive number`);
+      throw new Error(`Invalid ${fieldName}: "${value}" (${typeof value}) - must be a valid positive number`);
     }
     
     // Return as decimal with 2 decimal places for consistency
@@ -153,24 +192,51 @@ class ProductController {
         const { products, brandId, brandName, title, groupSku, subSku, category, collectionName, shipTypes, singleSetItem, attributes } = req.body;
 
         if (products && Array.isArray(products)) {
-          // Multiple products
+          // Multiple products with case-insensitive field extraction
           productsToCreate = products.map(product => ({
-            brandId: product.brandId,
-            brandName: product.brandName,
-            title: product.title?.trim(),
-            groupSku: product.groupSku?.trim(),
-            subSku: product.subSku?.trim(),
-            category: product.category?.trim(),
-            collectionName: product.collectionName?.trim(),
-            shipTypes: product.shipTypes?.trim(),
-            singleSetItem: product.singleSetItem?.trim(),
-            brandRealPrice: product.brandRealPrice,
-            brandMiscellaneous: product.brandMiscellaneous,
-            attributes: product.attributes || {}
+            brandId: ProductController.getFieldValue(product, 'brandId'),
+            brandName: ProductController.getFieldValue(product, 'brandName'),
+            title: ProductController.getFieldValue(product, 'title')?.trim(),
+            groupSku: ProductController.getFieldValue(product, 'groupSku')?.trim(),
+            subSku: ProductController.getFieldValue(product, 'subSku')?.trim(),
+            category: ProductController.getFieldValue(product, 'category')?.trim(),
+            collectionName: ProductController.getFieldValue(product, 'collectionName')?.trim(),
+            shipTypes: ProductController.getFieldValue(product, 'shipTypes')?.trim(),
+            singleSetItem: ProductController.getFieldValue(product, 'singleSetItem')?.trim(),
+            brandRealPrice: ProductController.getFieldValue(product, 'brandRealPrice'),
+            brandMiscellaneous: ProductController.getFieldValue(product, 'brandMiscellaneous'),
+            msrp: ProductController.getFieldValue(product, 'msrp'),
+            shippingPrice: ProductController.getFieldValue(product, 'shippingPrice'),
+            commissionPrice: ProductController.getFieldValue(product, 'commissionPrice'),
+            profitMarginPrice: ProductController.getFieldValue(product, 'profitMarginPrice'),
+            ecommerceMiscellaneous: ProductController.getFieldValue(product, 'ecommerceMiscellaneous'),
+            ecommercePrice: ProductController.getFieldValue(product, 'ecommercePrice'),
+            mainImageUrl: ProductController.getFieldValue(product, 'mainImageUrl'),
+            galleryImages: ProductController.getFieldValue(product, 'galleryImages'),
+            attributes: ProductController.getFieldValue(product, 'attributes') || {}
           }));
         } else if (title && groupSku) {
-          // Single product
-          const { brandRealPrice, brandMiscellaneous } = req.body;
+          // Single product - extract all fields from req.body with case-insensitive lookup
+          console.log('🔍 Single Product Request Body:', req.body);
+          
+          // Use case-insensitive field extraction
+          const brandId = ProductController.getFieldValue(req.body, 'brandId');
+          const brandName = ProductController.getFieldValue(req.body, 'brandName');
+          const brandRealPrice = ProductController.getFieldValue(req.body, 'brandRealPrice');
+          const brandMiscellaneous = ProductController.getFieldValue(req.body, 'brandMiscellaneous');
+          const msrp = ProductController.getFieldValue(req.body, 'msrp');
+          const shippingPrice = ProductController.getFieldValue(req.body, 'shippingPrice');
+          const commissionPrice = ProductController.getFieldValue(req.body, 'commissionPrice');
+          const profitMarginPrice = ProductController.getFieldValue(req.body, 'profitMarginPrice');
+          const ecommerceMiscellaneous = ProductController.getFieldValue(req.body, 'ecommerceMiscellaneous');
+          const ecommercePrice = ProductController.getFieldValue(req.body, 'ecommercePrice');
+          const mainImageUrl = ProductController.getFieldValue(req.body, 'mainImageUrl');
+          const galleryImages = ProductController.getFieldValue(req.body, 'galleryImages');
+          const attributes = ProductController.getFieldValue(req.body, 'attributes');
+          
+          console.log('🔍 Extracted MSRP (case-insensitive):', msrp, 'Type:', typeof msrp);
+          console.log('🔍 Available fields in request:', Object.keys(req.body));
+          
           productsToCreate = [{
             brandId: brandId,
             brandName: brandName,
@@ -183,12 +249,25 @@ class ProductController {
             singleSetItem: singleSetItem?.trim() || '',
             brandRealPrice: brandRealPrice,
             brandMiscellaneous: brandMiscellaneous,
+            msrp: msrp,
+            shippingPrice: shippingPrice,
+            commissionPrice: commissionPrice,
+            profitMarginPrice: profitMarginPrice,
+            ecommerceMiscellaneous: ecommerceMiscellaneous,
+            ecommercePrice: ecommercePrice,
+            mainImageUrl: mainImageUrl,
+            galleryImages: galleryImages,
             attributes: attributes || {}
           }];
         } else {
           return res.status(400).json({
             error: 'Invalid request format',
-            message: 'Provide either "products" array, single product data, or upload a file'
+            message: 'Provide either "products" array, single product data (with title and groupSku), or upload a file',
+            required: {
+              singleProduct: ['title', 'groupSku'],
+              multipleProducts: ['products array'],
+              fileUpload: ['upload Excel/CSV file']
+            }
           });
         }
       }
@@ -250,7 +329,7 @@ class ProductController {
           }
 
           // Validate and convert price values
-          let brandRealPrice, brandMiscellaneous;
+          let brandRealPrice, brandMiscellaneous, msrp;
           
           console.log('🔍 Price Validation Debug:', {
             title: productData.title,
@@ -260,7 +339,8 @@ class ProductController {
             brandMiscellaneousType: typeof productData.brandMiscellaneous,
             msrp: productData.msrp,
             msrpType: typeof productData.msrp,
-            allFields: Object.keys(productData)
+            allFields: Object.keys(productData),
+            msrpFieldFound: ProductController.normalizeFieldName(productData, 'msrp') !== null
           });
           
           try {
@@ -278,24 +358,30 @@ class ProductController {
             brandMiscellaneous = ProductController.validatePrice(productData.brandMiscellaneous, 'Brand Miscellaneous') || 0;
             console.log('✅ Brand Miscellaneous validation result:', brandMiscellaneous);
             
-            // Validate MSRP
-            if (productData.msrp === undefined || productData.msrp === null || productData.msrp === '') {
+            // Validate MSRP (case-insensitive)
+            const msrpValue = ProductController.getFieldValue(productData, 'msrp');
+            if (msrpValue === undefined || msrpValue === null || msrpValue === '') {
               results.errors.push({
                 title: productData.title,
-                error: 'MSRP is mandatory'
+                error: 'MSRP is mandatory (field not found or empty)'
               });
               continue;
             }
             
-            const msrp = ProductController.validatePrice(productData.msrp, 'MSRP');
+            msrp = ProductController.validatePrice(msrpValue, 'MSRP');
             console.log('✅ MSRP validation result:', msrp);
+            console.log('🚀 Proceeding to product creation...');
           } catch (error) {
             console.error('❌ Price validation error:', error.message);
-            results.errors.push(`Product "${productData.title}": ${error.message}`);
+            results.errors.push({
+              title: productData.title,
+              error: error.message
+            });
             continue;
           }
 
           // Process attributes (clean up empty values)
+          console.log('🔧 Processing attributes...');
           let finalAttributes = { ...productData.attributes };
           
           // Filter out empty/null values from attributes
@@ -307,11 +393,19 @@ class ProductController {
               delete finalAttributes[key];
             }
           });
+          console.log('✅ Attributes processed:', finalAttributes);
 
           // Note: Images are processed separately after product creation
           // This allows products to be created first, then images uploaded later
 
           // Create product
+          console.log('📝 Creating product with data:', {
+            brandId: brand.id,
+            title: productData.title,
+            groupSku: productData.groupSku,
+            msrp: msrp
+          });
+          
           const product = await ProductModel.create({
             brandId: brand.id,
             title: productData.title,
@@ -324,6 +418,7 @@ class ProductController {
             // Brand Pricing (using validated and converted values)
             brandRealPrice: brandRealPrice,
             brandMiscellaneous: brandMiscellaneous,
+            brandPrice: brandRealPrice, // Calculate brandPrice as brandRealPrice + brandMiscellaneous
             msrp: msrp,
             // Ecommerce Pricing (from request or default to 0)
             shippingPrice: productData.shippingPrice || 0,
@@ -1170,17 +1265,28 @@ class ProductController {
           mimetype: req.file.mimetype
         };
       } else {
-        // Handle JSON data
-        const { products } = req.body;
+        // Handle JSON data (single product, multiple products, or products array)
+        const { products, title, groupSku, brandName } = req.body;
 
-        if (!products || !Array.isArray(products)) {
+        if (products && Array.isArray(products)) {
+          // Multiple products in array format
+          productsToCreate = products;
+        } else if (title && groupSku) {
+          // Single product format - convert to array
+          productsToCreate = [req.body];
+          // Update req.body to have products array for createProduct method
+          req.body = { products: productsToCreate };
+        } else {
           return res.status(400).json({
             error: 'Invalid request format',
-            message: 'Provide "products" array or upload a file'
+            message: 'Provide either "products" array, single product data (with title and groupSku), or upload a file',
+            supported: {
+              singleProduct: ['title', 'groupSku', 'brandName', '...'],
+              multipleProducts: ['products array'],
+              fileUpload: ['Excel/CSV file']
+            }
           });
         }
-
-        productsToCreate = products;
       }
 
       // For small datasets (< 1000), process immediately

@@ -20,7 +20,7 @@ class AuthController {
 
       // Check if this is the first user (no users exist)
       const allUsers = await UserModel.getAllUsersBasic();
-      const isFirstUser = allUsers.length === 0;
+      const isFirstUser = allUsers.users ? allUsers.users.length === 0 : allUsers.length === 0;
 
       // If not first user, require admin authorization
       if (!isFirstUser) {
