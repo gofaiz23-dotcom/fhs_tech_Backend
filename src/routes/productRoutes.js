@@ -19,5 +19,6 @@ router.delete('/:id', validateId, ProductController.deleteProduct);   // 6. Dele
 router.delete('/', requireAdmin, ProductController.deleteAllProducts); // 7. Delete all products (Admin only)
 router.put('/images', conditionalImageUpload, handleUploadError, ProductController.uploadProductImages); // 8. Upload product images (single/bulk, JSON + Form Data) - Only for existing products
 router.get('/status', ProductController.getBulkStatus); // 9. Get bulk processing status (user jobs + admin queue stats)
+router.post('/debug', uploadSingleHybrid, handleUploadError, ProductController.debugExcelFile); // 10. Debug Excel file processing
 
 export default router;

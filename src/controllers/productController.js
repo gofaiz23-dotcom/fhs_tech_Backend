@@ -1297,6 +1297,58 @@ class ProductController {
     }
   }
 
+  // Debug endpoint to test Excel file processing
+  static async debugExcelFile(req, res) {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No file uploaded'
+        });
+      }
+
+      console.log('🔍 DEBUG: Processing file for analysis...');
+      console.log('📁 File info:', {
+        originalName: req.file.originalname,
+        filename: req.file.filename,
+        size: req.file.size,
+        mimetype: req.file.mimetype
+      });
+
+      // Process the file to see what data we get
+      const processedData = await FileProcessor.processFileBuffer(req.file.buffer, req.file.originalname);
+      
+      console.log('📊 DEBUG: Processed data sample (first 2 records):');
+      if (processedData && processedData.length > 0) {
+        console.log('🔍 First record fields:', Object.keys(processedData[0]));
+        console.log('🔍 First record data:', processedData[0]);
+        if (processedData.length > 1) {
+          console.log('🔍 Second record data:', processedData[1]);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: 'File processed successfully for debugging',
+        fileInfo: {
+          originalName: req.file.originalname,
+          filename: req.file.filename,
+          size: req.file.size,
+          mimetype: req.file.mimetype
+        },
+        dataSample: processedData ? processedData.slice(0, 2) : [],
+        totalRecords: processedData ? processedData.length : 0,
+        firstRecordFields: processedData && processedData.length > 0 ? Object.keys(processedData[0]) : []
+      });
+    } catch (error) {
+      console.error('❌ DEBUG: Error processing file:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to process file for debugging',
+        error: error.message
+      });
+    }
+  }
 }
 
 export default ProductController;
