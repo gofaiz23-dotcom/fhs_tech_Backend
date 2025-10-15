@@ -28,6 +28,8 @@ class FileProcessor {
       'sku': 'groupSku',
       'product_sku': 'groupSku',
       'productsku': 'groupSku',
+      'Group SKU': 'groupSku',
+      'GROUP SKU': 'groupSku',
       
       // Sub SKU variations
       'sub_sku': 'subSku',
@@ -36,6 +38,8 @@ class FileProcessor {
       'sub': 'subSku',
       'variant_sku': 'subSku',
       'variantsku': 'subSku',
+      'Sub SKU': 'subSku',
+      'SUB SKU': 'subSku',
       
       // Brand Name variations
       'brand_name': 'brandName',
@@ -43,6 +47,8 @@ class FileProcessor {
       'brand': 'brandName',
       'manufacturer': 'brandName',
       'company': 'brandName',
+      'Brand Name': 'brandName',
+      'BRAND NAME': 'brandName',
       
       // Brand Real Price variations
       'brand_real_price': 'brandRealPrice',
@@ -57,6 +63,8 @@ class FileProcessor {
       'wholesaleprice': 'brandRealPrice',
       'base_price': 'brandRealPrice',
       'baseprice': 'brandRealPrice',
+      'Brand Real Price': 'brandRealPrice',
+      'BRAND REAL PRICE': 'brandRealPrice',
       
       // MSRP variations - handle all case combinations
       'msrp': 'msrp',
@@ -123,6 +131,8 @@ class FileProcessor {
       'description': 'title',
       'product_description': 'title',
       'productdescription': 'title',
+      'Title': 'title',
+      'TITLE': 'title',
       
       // Category variations
       'category': 'category',
@@ -218,6 +228,8 @@ class FileProcessor {
       
       console.log('📋 Original Excel headers:', originalHeaders);
       console.log('📋 Normalized headers:', headers);
+      console.log('📋 First row data sample:', rows[0]);
+      console.log('📋 Second row data sample:', rows[1]);
       
       
       
@@ -234,7 +246,14 @@ class FileProcessor {
               obj[header] = value;
             } else {
               // Handle string values
-              const stringValue = String(value).trim();
+              let stringValue = String(value).trim();
+              
+              // Clean up commas in numeric fields (like prices)
+              if (header === 'msrp' || header === 'brandRealPrice' || header === 'brandMiscellaneous') {
+                // Remove commas from numeric fields
+                stringValue = stringValue.replace(/,/g, '');
+              }
+              
               // Try to convert to number if it looks like a number
               if (stringValue !== '' && !isNaN(stringValue) && !isNaN(parseFloat(stringValue))) {
                 obj[header] = parseFloat(stringValue);
