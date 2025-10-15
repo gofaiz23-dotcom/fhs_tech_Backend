@@ -147,9 +147,9 @@ class ManagementHistoryModel {
     });
   }
 
-  // Product Management History (Future)
-  static async createProductHistory(historyData) {
-    return await prisma.productManagementHistory.create({
+  // Listing Management History
+  static async createListingHistory(historyData) {
+    return await prisma.listingManagementHistory.create({
       data: historyData,
       include: {
         user: {

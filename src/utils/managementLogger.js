@@ -112,6 +112,25 @@ class ManagementLogger {
     }
   }
 
+  // Log Listing Management Actions
+  static async logListingAction(userId, action, listingId, brandId, details = null, req = null) {
+    try {
+      const logData = {
+        userId,
+        listingId,
+        brandId,
+        action, // CREATE, UPDATE, DELETE, DELETE_ALL, BULK_CREATE
+        details,
+        ipAddress: req?.ip || null,
+        userAgent: req?.get('User-Agent') || null
+      };
+
+      await ManagementHistoryModel.createListingHistory(logData);
+    } catch (error) {
+      console.error('Failed to log listing management action:', error);
+    }
+  }
+
   // Helper method to create details object
   static createDetailsObject(oldData = null, newData = null, additionalInfo = {}) {
     return {

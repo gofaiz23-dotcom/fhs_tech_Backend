@@ -6,6 +6,7 @@ import marketplaceRoutes from './marketplaceRoutes.js';
 import shippingRoutes from './shippingRoutes.js';
 import productRoutes from './productRoutes.js';
 import productPricingRoutes from './productPricingRoutes.js';
+import listingRoutes from './listingRoutes.js';
 import permissionRoutes from './permissionRoutes.js';
 import managementHistoryRoutes from './managementHistoryRoutes.js';
 import userActivityRoutes from './userActivityRoutes.js';
@@ -21,6 +22,7 @@ router.use('/marketplaces', marketplaceRoutes);
 router.use('/shipping', shippingRoutes);
 router.use('/products', productRoutes);
 router.use('/products/pricing', productPricingRoutes);
+router.use('/listings', listingRoutes);
 router.use('/users', permissionRoutes);
 router.use('/management', managementHistoryRoutes);
 router.use('/activities', userActivityRoutes);
@@ -85,6 +87,7 @@ router.get('/', (req, res) => {
       marketplaces: '/api/marketplaces',
       shipping: '/api/shipping',
       products: '/api/products',
+      listings: '/api/listings',
       permissions: '/api/users',
       management: '/api/management',
       activities: '/api/activities',

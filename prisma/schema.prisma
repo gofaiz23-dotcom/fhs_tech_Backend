@@ -36,6 +36,7 @@ model User {
   adminPermissionActions PermissionManagementHistory[] @relation("AdminPermissionActions")
   targetUserPermissionActions PermissionManagementHistory[] @relation("TargetUserPermissionActions")
   productActions ProductManagementHistory[] @relation("UserProductActions")
+  listingActions ListingManagementHistory[] @relation("UserListingActions")
 
   @@map("users")
   @@index([email])
@@ -61,6 +62,8 @@ model Brand {
   managementHistory BrandManagementHistory[]
   productActions ProductManagementHistory[] @relation("BrandProductActions")
   products Product[]
+  listingActions ListingManagementHistory[] @relation("BrandListingActions")
+  listings Listing[]
 
   @@map("brands")
   @@index([name])
@@ -373,6 +376,7 @@ model Product {
   // Relations
   brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
   productHistory ProductManagementHistory[]
+  listings Listing[]
 
   @@map("products")
   @@index([brandId])
@@ -381,4 +385,79 @@ model Product {
   @@index([createdAt])
   @@index([brandId, category])
   @@index([brandId, ecommercePrice])
+}
+
+// 11. Listings Table (Product validation only - groupSku and subSku must exist in products)
+model Listing {
+  id          Int      @id @default(autoincrement())
+  productId   Int      @map("product_id")  // Reference to Product - For validation only
+  brandId     Int      @map("brand_id")
+  title       String
+  groupSku    String   @map("group_sku")  // Not unique - multiple listings can have same SKU
+  subSku      String?  @map("sub_sku")  // Nullable, supports comma-separated values like "123ed,345Df,678gh"
+  category    String
+  collectionName String @default("") @map("collection_name")
+  shipTypes   String   @map("ship_types")
+  singleSetItem String @map("single_set_item")
+  
+  
+  // Brand Pricing Columns (Mandatory)
+  brandRealPrice      Decimal @map("brand_real_price") @db.Decimal(10,2)
+  brandMiscellaneous  Decimal @map("brand_miscellaneous") @db.Decimal(10,2)
+  brandPrice          Decimal @map("brand_price") @db.Decimal(10,2)
+  msrp               Decimal @default(0.00) @map("msrp") @db.Decimal(10,2) // Manufacturer's Suggested Retail Price
+  
+  // Ecommerce Pricing Columns (Mandatory)
+  shippingPrice       Decimal @map("shipping_price") @db.Decimal(10,2)
+  commissionPrice     Decimal @map("commission_price") @db.Decimal(10,2)
+  profitMarginPrice   Decimal @map("profit_margin_price") @db.Decimal(10,2)
+  ecommerceMiscellaneous Decimal @map("ecommerce_miscellaneous") @db.Decimal(10,2)
+  ecommercePrice      Decimal @map("ecommerce_price") @db.Decimal(10,2)
+  
+  // Image Columns (Optional)
+  mainImageUrl        String? @map("main_image_url") // Main listing image URL
+  galleryImages       Json?   @map("gallery_images") // Array of gallery image URLs
+  
+  attributes  Json     // All extra data in JSONB format
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  listingHistory ListingManagementHistory[]
+
+  @@map("listings")
+  @@index([productId])
+  @@index([brandId])
+  @@index([category])
+  @@index([ecommercePrice])
+  @@index([createdAt])
+  @@index([brandId, category])
+  @@index([brandId, ecommercePrice])
+}
+
+// Listing Management History
+model ListingManagementHistory {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")        // User who performed the action
+  brandId     Int      @map("brand_id")       // Brand for which listing was managed
+  listingId   Int?     @map("listing_id")     // Listing ID (if available)
+  action      String   // CREATE, UPDATE, DELETE, BULK_CREATE, DELETE_ALL
+  details     Json?    // Listing details, old/new values
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user        User     @relation("UserListingActions", fields: [userId], references: [id], onDelete: Cascade)
+  brand       Brand    @relation("BrandListingActions", fields: [brandId], references: [id], onDelete: Cascade)
+  listing     Listing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@map("listing_management_history")
+  @@index([userId])
+  @@index([brandId])
+  @@index([listingId])
+  @@index([action])
+  @@index([createdAt])
 }
