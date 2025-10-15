@@ -1,6 +1,7 @@
 import ProductModel from '../models/Product.js';
 import { prisma } from '../config/database.js';
 import ManagementLogger from '../utils/managementLogger.js';
+import queueService from '../services/queueService.js';
 
 class ProductPricingController {
   // Helper method for validating and converting price values
@@ -113,24 +114,51 @@ class ProductPricingController {
     }
   }
 
-  // Update product pricing
+  // Update product pricing - handles both single and bulk updates (only if product exists)
   static async updateProductPricing(req, res) {
     try {
-      const productId = parseInt(req.params.id);
+      // Check if this is bulk pricing update
+      if (req.body.pricingData && Array.isArray(req.body.pricingData)) {
+        return ProductPricingController.bulkUpdatePricing(req, res);
+      }
+
+      // Single product pricing update - productId, groupSku, or subSku must be provided
       const {
+        productId,
+        groupSku,
+        subSku,
         brandRealPrice,
         brandMiscellaneous,
         shippingPrice,
         commissionPrice,
         profitMarginPrice,
-        ecommerceMiscellaneous
+        ecommerceMiscellaneous,
+        msrp
       } = req.body;
 
-      // Check if product exists
-      const existingProduct = await ProductModel.findById(productId);
+      // Validate at least one identifier is provided
+      if (!productId && !groupSku && !subSku) {
+        return res.status(400).json({
+          error: 'Product identifier required',
+          message: 'Provide productId, groupSku, or subSku in request body for single product update'
+        });
+      }
+
+      // Find product by ID, groupSku, or subSku
+      let existingProduct;
+      if (productId) {
+        existingProduct = await ProductModel.findById(parseInt(productId));
+      } else if (subSku) {
+        existingProduct = await ProductModel.findBySubSku(subSku);
+      } else if (groupSku) {
+        existingProduct = await ProductModel.findByGroupSku(groupSku);
+      }
+
       if (!existingProduct) {
+        const identifier = productId || subSku || groupSku;
         return res.status(404).json({
-          error: 'Product not found'
+          error: 'Product not found',
+          message: `Product with identifier ${identifier} does not exist`
         });
       }
 
@@ -163,31 +191,46 @@ class ProductPricingController {
                                parseFloat(ecommerceMiscellaneous || existingProduct.ecommerceMiscellaneous);
 
       // Update product pricing
-      const updatedProduct = await ProductModel.update(productId, {
-        brandRealPrice: brandRealPrice || existingProduct.brandRealPrice,
-        brandMiscellaneous: brandMiscellaneous || existingProduct.brandMiscellaneous,
+      const updatedProduct = await ProductModel.update(parseInt(productId), {
+        brandRealPrice: brandRealPrice !== undefined ? parseFloat(brandRealPrice) : existingProduct.brandRealPrice,
+        brandMiscellaneous: brandMiscellaneous !== undefined ? parseFloat(brandMiscellaneous) : existingProduct.brandMiscellaneous,
         brandPrice: newBrandPrice,
-        shippingPrice: shippingPrice || existingProduct.shippingPrice,
-        commissionPrice: commissionPrice || existingProduct.commissionPrice,
-        profitMarginPrice: profitMarginPrice || existingProduct.profitMarginPrice,
-        ecommerceMiscellaneous: ecommerceMiscellaneous || existingProduct.ecommerceMiscellaneous,
-        ecommercePrice: newEcommercePrice
+        shippingPrice: shippingPrice !== undefined ? parseFloat(shippingPrice) : existingProduct.shippingPrice,
+        commissionPrice: commissionPrice !== undefined ? parseFloat(commissionPrice) : existingProduct.commissionPrice,
+        profitMarginPrice: profitMarginPrice !== undefined ? parseFloat(profitMarginPrice) : existingProduct.profitMarginPrice,
+        ecommerceMiscellaneous: ecommerceMiscellaneous !== undefined ? parseFloat(ecommerceMiscellaneous) : existingProduct.ecommerceMiscellaneous,
+        ecommercePrice: newEcommercePrice,
+        msrp: msrp !== undefined ? parseFloat(msrp) : existingProduct.msrp
       });
 
       // Log management action
       await ManagementLogger.logProductAction(
         req.user.userId,
         'UPDATE_PRICING',
-        productId,
+        parseInt(productId),
         existingProduct.brandId,
         { 
           oldData: {
+            brandRealPrice: existingProduct.brandRealPrice,
+            brandMiscellaneous: existingProduct.brandMiscellaneous,
             brandPrice: existingProduct.brandPrice,
-            ecommercePrice: existingProduct.ecommercePrice
+            shippingPrice: existingProduct.shippingPrice,
+            commissionPrice: existingProduct.commissionPrice,
+            profitMarginPrice: existingProduct.profitMarginPrice,
+            ecommerceMiscellaneous: existingProduct.ecommerceMiscellaneous,
+            ecommercePrice: existingProduct.ecommercePrice,
+            msrp: existingProduct.msrp
           }, 
           newData: {
+            brandRealPrice: updatedProduct.brandRealPrice,
+            brandMiscellaneous: updatedProduct.brandMiscellaneous,
             brandPrice: newBrandPrice,
-            ecommercePrice: newEcommercePrice
+            shippingPrice: updatedProduct.shippingPrice,
+            commissionPrice: updatedProduct.commissionPrice,
+            profitMarginPrice: updatedProduct.profitMarginPrice,
+            ecommerceMiscellaneous: updatedProduct.ecommerceMiscellaneous,
+            ecommercePrice: newEcommercePrice,
+            msrp: updatedProduct.msrp
           }
         },
         req
@@ -198,6 +241,8 @@ class ProductPricingController {
         product: {
           id: updatedProduct.id,
           title: updatedProduct.title,
+          groupSku: updatedProduct.groupSku,
+          subSku: updatedProduct.subSku,
           pricing: {
             brandPricing: {
               brandRealPrice: parseFloat(updatedProduct.brandRealPrice),
@@ -211,7 +256,8 @@ class ProductPricingController {
               profitMarginPrice: parseFloat(updatedProduct.profitMarginPrice),
               ecommerceMiscellaneous: parseFloat(updatedProduct.ecommerceMiscellaneous),
               ecommercePrice: parseFloat(updatedProduct.ecommercePrice)
-            }
+            },
+            msrp: parseFloat(updatedProduct.msrp)
           }
         }
       });
@@ -259,181 +305,157 @@ class ProductPricingController {
     }
   }
 
-  // Bulk update ecommerce pricing for all products
-  static async updateEcommerceAll(req, res) {
+  // Bulk pricing update - Background processing (for large datasets)
+  static async bulkUpdatePricing(req, res) {
     try {
-      const { shippingPrice, commissionPrice, profitMarginPrice, ecommerceMiscellaneous } = req.body;
-      
-      // Get all products (for bulk operations, we need all products)
-      const result = await ProductModel.findAll(req.user.userId, req.user.role, 1, 1000000); // Large limit for bulk operations
-      const products = result.products;
-      
-      const updatedProducts = [];
-      const errors = [];
-      
-      for (const product of products) {
-        try {
-          // Calculate new ecommerce price with existing brandPrice
-          const newEcommercePrice = parseFloat(product.brandPrice) + 
-                                   parseFloat(shippingPrice || 0) + 
-                                   parseFloat(commissionPrice || 0) + 
-                                   parseFloat(profitMarginPrice || 0) + 
-                                   parseFloat(ecommerceMiscellaneous || 0);
-          
-          // Update product
-          const updatedProduct = await ProductModel.update(product.id, {
-            shippingPrice: shippingPrice !== undefined ? parseFloat(shippingPrice) : product.shippingPrice,
-            commissionPrice: commissionPrice !== undefined ? parseFloat(commissionPrice) : product.commissionPrice,
-            profitMarginPrice: profitMarginPrice !== undefined ? parseFloat(profitMarginPrice) : product.profitMarginPrice,
-            ecommerceMiscellaneous: ecommerceMiscellaneous !== undefined ? parseFloat(ecommerceMiscellaneous) : product.ecommerceMiscellaneous,
-            ecommercePrice: newEcommercePrice
-          });
-          
-          updatedProducts.push(updatedProduct);
-          
-          // Log management action
-          await ManagementLogger.logProductAction(
-            req.user.userId,
-            'BULK_UPDATE_ECOMMERCE',
-            product.id,
-            product.brandId,
-            { 
-              oldEcommercePrice: parseFloat(product.ecommercePrice),
-              newEcommercePrice: newEcommercePrice,
-              updatedFields: {
-                shippingPrice: shippingPrice !== undefined ? parseFloat(shippingPrice) : product.shippingPrice,
-                commissionPrice: commissionPrice !== undefined ? parseFloat(commissionPrice) : product.commissionPrice,
-                profitMarginPrice: profitMarginPrice !== undefined ? parseFloat(profitMarginPrice) : product.profitMarginPrice,
-                ecommerceMiscellaneous: ecommerceMiscellaneous !== undefined ? parseFloat(ecommerceMiscellaneous) : product.ecommerceMiscellaneous
-              }
-            },
-            req
-          );
-          
-        } catch (error) {
-          errors.push({
-            productId: product.id,
-            title: product.title,
-            error: error.message
-          });
-        }
+      const { pricingData } = req.body;
+
+      if (!pricingData || !Array.isArray(pricingData)) {
+        return res.status(400).json({
+          error: 'Invalid request format',
+          message: 'Provide "pricingData" array'
+        });
       }
-      
-      res.json({
-        message: 'Bulk ecommerce pricing update completed',
-        summary: {
-          totalProducts: products.length,
-          updated: updatedProducts.length,
-          errors: errors.length
-        },
-        updatedProducts: updatedProducts.map(p => ({
-          id: p.id,
-          title: p.title,
-          brandPrice: parseFloat(p.brandPrice),
-          ecommercePrice: parseFloat(p.ecommercePrice)
-        })),
-        errors: errors
+
+      // Validate pricing data structure - each item must have productId, groupSku, or subSku
+      const validPricingData = pricingData.filter(item => {
+        const hasIdentifier = item.productId || item.groupSku || item.subSku;
+        const hasPriceField = (
+          item.brandRealPrice !== undefined || 
+          item.brandMiscellaneous !== undefined ||
+          item.shippingPrice !== undefined ||
+          item.commissionPrice !== undefined ||
+          item.profitMarginPrice !== undefined ||
+          item.ecommerceMiscellaneous !== undefined ||
+          item.msrp !== undefined
+        );
+        return hasIdentifier && hasPriceField;
       });
-      
+
+      if (validPricingData.length === 0) {
+        return res.status(400).json({
+          error: 'No valid pricing data provided',
+          message: 'Each item must have productId/groupSku/subSku and at least one price field'
+        });
+      }
+
+      // For small datasets, process immediately
+      if (validPricingData.length < 1000) {
+        const updatedProducts = [];
+        const errors = [];
+
+        for (const pricingItem of validPricingData) {
+          try {
+            // Find product by ID, groupSku, or subSku
+            let existingProduct;
+            if (pricingItem.productId) {
+              existingProduct = await ProductModel.findById(pricingItem.productId);
+            } else if (pricingItem.subSku) {
+              existingProduct = await ProductModel.findBySubSku(pricingItem.subSku);
+            } else if (pricingItem.groupSku) {
+              existingProduct = await ProductModel.findByGroupSku(pricingItem.groupSku);
+            }
+
+            if (!existingProduct) {
+              const identifier = pricingItem.productId || pricingItem.subSku || pricingItem.groupSku;
+              errors.push({
+                identifier: identifier,
+                error: 'Product not found'
+              });
+              continue;
+            }
+
+            // Check user access (for non-admin users)
+            if (req.user.role !== 'ADMIN') {
+              const hasAccess = await prisma.userBrandAccess.findFirst({
+                where: {
+                  userId: req.user.userId,
+                  brandId: existingProduct.brandId,
+                  isActive: true
+                }
+              });
+
+              if (!hasAccess) {
+                errors.push({
+                  identifier: pricingItem.productId || pricingItem.subSku || pricingItem.groupSku,
+                  error: `Access denied to brand: ${existingProduct.brand.name}`
+                });
+                continue;
+              }
+            }
+
+            // Calculate new prices
+            const newBrandPrice = parseFloat(pricingItem.brandRealPrice || existingProduct.brandRealPrice) + 
+                                 parseFloat(pricingItem.brandMiscellaneous || existingProduct.brandMiscellaneous);
+            
+            const newEcommercePrice = newBrandPrice + 
+                                     parseFloat(pricingItem.shippingPrice || existingProduct.shippingPrice) + 
+                                     parseFloat(pricingItem.commissionPrice || existingProduct.commissionPrice) + 
+                                     parseFloat(pricingItem.profitMarginPrice || existingProduct.profitMarginPrice) + 
+                                     parseFloat(pricingItem.ecommerceMiscellaneous || existingProduct.ecommerceMiscellaneous);
+
+            // Update product pricing
+            const updatedProduct = await ProductModel.update(existingProduct.id, {
+              brandRealPrice: pricingItem.brandRealPrice !== undefined ? parseFloat(pricingItem.brandRealPrice) : existingProduct.brandRealPrice,
+              brandMiscellaneous: pricingItem.brandMiscellaneous !== undefined ? parseFloat(pricingItem.brandMiscellaneous) : existingProduct.brandMiscellaneous,
+              brandPrice: newBrandPrice,
+              shippingPrice: pricingItem.shippingPrice !== undefined ? parseFloat(pricingItem.shippingPrice) : existingProduct.shippingPrice,
+              commissionPrice: pricingItem.commissionPrice !== undefined ? parseFloat(pricingItem.commissionPrice) : existingProduct.commissionPrice,
+              profitMarginPrice: pricingItem.profitMarginPrice !== undefined ? parseFloat(pricingItem.profitMarginPrice) : existingProduct.profitMarginPrice,
+              ecommerceMiscellaneous: pricingItem.ecommerceMiscellaneous !== undefined ? parseFloat(pricingItem.ecommerceMiscellaneous) : existingProduct.ecommerceMiscellaneous,
+              ecommercePrice: newEcommercePrice,
+              msrp: pricingItem.msrp !== undefined ? parseFloat(pricingItem.msrp) : existingProduct.msrp
+            });
+
+            updatedProducts.push({
+              identifier: pricingItem.productId || pricingItem.subSku || pricingItem.groupSku,
+              productId: updatedProduct.id,
+              message: 'Pricing updated successfully'
+            });
+
+          } catch (error) {
+            errors.push({
+              identifier: pricingItem.productId || pricingItem.subSku || pricingItem.groupSku,
+              error: error.message
+            });
+          }
+        }
+
+        return res.json({
+          message: 'Bulk pricing update completed',
+          summary: {
+            totalProducts: validPricingData.length,
+            updated: updatedProducts.length,
+            errors: errors.length
+          },
+          updatedProducts: updatedProducts,
+          errors: errors
+        });
+      }
+
+      // For large datasets, use background processing
+      const jobResult = await queueService.addBulkPricingJob({
+        pricingData: validPricingData
+      }, req.user.userId);
+
+      res.status(202).json({
+        message: `Large pricing dataset detected (${validPricingData.length} products). Processing in background.`,
+        jobId: jobResult.jobId,
+        status: jobResult.status,
+        totalProducts: validPricingData.length,
+        estimatedTime: `${Math.ceil(validPricingData.length / 200)} minutes`,
+        timestamp: new Date().toISOString()
+      });
+
     } catch (error) {
-      console.error('Bulk ecommerce pricing update error:', error);
+      console.error('Bulk pricing update error:', error);
       res.status(500).json({
-        error: 'Failed to update ecommerce pricing',
+        error: 'Failed to update pricing',
         details: error.message
       });
     }
   }
 
-  // Bulk update brand miscellaneous for all products
-  static async updateBrandMiscAll(req, res) {
-    try {
-      const { brandMiscellaneous } = req.body;
-      
-      if (brandMiscellaneous === undefined) {
-        return res.status(400).json({
-          error: 'brandMiscellaneous is required'
-        });
-      }
-      
-      // Get all products (for bulk operations, we need all products)
-      const result = await ProductModel.findAll(req.user.userId, req.user.role, 1, 1000000); // Large limit for bulk operations
-      const products = result.products;
-      
-      const updatedProducts = [];
-      const errors = [];
-      
-      for (const product of products) {
-        try {
-          // Calculate new brand price
-          const newBrandPrice = parseFloat(product.brandRealPrice) + parseFloat(brandMiscellaneous);
-          
-          // Calculate new ecommerce price (update with new brand price)
-          const newEcommercePrice = newBrandPrice + 
-                                   parseFloat(product.shippingPrice) + 
-                                   parseFloat(product.commissionPrice) + 
-                                   parseFloat(product.profitMarginPrice) + 
-                                   parseFloat(product.ecommerceMiscellaneous);
-          
-          // Update product
-          const updatedProduct = await ProductModel.update(product.id, {
-            brandMiscellaneous: parseFloat(brandMiscellaneous),
-            brandPrice: newBrandPrice,
-            ecommercePrice: newEcommercePrice
-          });
-          
-          updatedProducts.push(updatedProduct);
-          
-          // Log management action
-          await ManagementLogger.logProductAction(
-            req.user.userId,
-            'BULK_UPDATE_BRAND_MISC',
-            product.id,
-            product.brandId,
-            { 
-              oldBrandPrice: parseFloat(product.brandPrice),
-              newBrandPrice: newBrandPrice,
-              oldEcommercePrice: parseFloat(product.ecommercePrice),
-              newEcommercePrice: newEcommercePrice,
-              brandMiscellaneous: parseFloat(brandMiscellaneous)
-            },
-            req
-          );
-          
-        } catch (error) {
-          errors.push({
-            productId: product.id,
-            title: product.title,
-            error: error.message
-          });
-        }
-      }
-      
-      res.json({
-        message: 'Bulk brand miscellaneous pricing update completed',
-        summary: {
-          totalProducts: products.length,
-          updated: updatedProducts.length,
-          errors: errors.length
-        },
-        updatedProducts: updatedProducts.map(p => ({
-          id: p.id,
-          title: p.title,
-          brandRealPrice: parseFloat(p.brandRealPrice),
-          brandMiscellaneous: parseFloat(p.brandMiscellaneous),
-          brandPrice: parseFloat(p.brandPrice),
-          ecommercePrice: parseFloat(p.ecommercePrice)
-        })),
-        errors: errors
-      });
-      
-    } catch (error) {
-      console.error('Bulk brand miscellaneous pricing update error:', error);
-      res.status(500).json({
-        error: 'Failed to update brand miscellaneous pricing',
-        details: error.message
-      });
-    }
-  }
 }
 
 export default ProductPricingController;

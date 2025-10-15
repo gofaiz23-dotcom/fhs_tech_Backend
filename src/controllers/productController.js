@@ -1,6 +1,7 @@
 import ProductModel from '../models/Product.js';
 import ManagementLogger from '../utils/managementLogger.js';
 import ImageService from '../services/imageService.js';
+import queueService from '../services/queueService.js';
 import { prisma } from '../config/database.js';
 
 class ProductController {
@@ -285,7 +286,7 @@ class ProductController {
             continue;
           }
 
-          // Process image URLs if present in attributes
+          // Process attributes (without image processing during product creation)
           let finalAttributes = { ...productData.attributes };
           
           // Filter out empty/null values from attributes
@@ -297,50 +298,9 @@ class ProductController {
               delete finalAttributes[key];
             }
           });
-          
-          if (finalAttributes.mainImageUrl || finalAttributes.galleryImages) {
-            try {
-              const productSku = productData.groupSku || productData.subSku;
-              let imageDownloadResults = { successful: [], failed: [] };
 
-              // Download main image
-              if (finalAttributes.mainImageUrl) {
-                try {
-                  const mainImageResult = await ImageService.downloadImage(finalAttributes.mainImageUrl, productSku);
-                  finalAttributes.mainImageUrl = mainImageResult.url;
-                  imageDownloadResults.successful.push(mainImageResult);
-                } catch (error) {
-                  imageDownloadResults.failed.push({ url: finalAttributes.mainImageUrl, error: error.message });
-                  console.warn(`Failed to download main image for ${productData.title}:`, error.message);
-                }
-              }
-
-              // Download gallery images
-              if (finalAttributes.galleryImages && Array.isArray(finalAttributes.galleryImages)) {
-                const galleryResults = await ImageService.downloadMultipleImages(finalAttributes.galleryImages, productSku);
-                imageDownloadResults.successful = [...imageDownloadResults.successful, ...galleryResults.successful];
-                imageDownloadResults.failed = [...imageDownloadResults.failed, ...galleryResults.failed];
-                
-                // Update gallery images with local URLs
-                finalAttributes.galleryImages = galleryResults.successful.map(item => item.url);
-              }
-
-              // Add download info to attributes
-              finalAttributes.imageDownloadInfo = {
-                successful: imageDownloadResults.successful.length,
-                failed: imageDownloadResults.failed.length,
-                failedUrls: imageDownloadResults.failed
-              };
-
-            } catch (error) {
-              console.warn(`Image processing failed for ${productData.title}:`, error.message);
-              finalAttributes.imageDownloadInfo = {
-                error: error.message,
-                successful: 0,
-                failed: 1
-              };
-            }
-          }
+          // Note: Images are processed separately after product creation
+          // This allows products to be created first, then images uploaded later
 
           // Create product
           const product = await ProductModel.create({
@@ -585,31 +545,42 @@ class ProductController {
     }
   }
 
-  // Upload product images - supports both JSON and Form Data uploads
+  // Upload product images - supports both single and bulk uploads (JSON and Form Data) - Only for existing products
   static async uploadProductImages(req, res) {
     try {
-      console.log('🔍 Request body:', req.body);
+      console.log('🔍 Image Upload Request body:', req.body);
       console.log('🔍 Content-Type:', req.get('Content-Type'));
       
-      let groupSku, subSku, imageUrls;
+      let groupSku, subSku, imageUrls, productId;
       
       // Handle both JSON and Form Data
       if (req.get('Content-Type') && req.get('Content-Type').includes('application/json')) {
         // JSON request
         const body = req.body;
+        
+        // Check if this is bulk image data
+        if (body.imageData && Array.isArray(body.imageData)) {
+          // Bulk image upload - use background processing
+          return ProductController.bulkUploadImages(req, res);
+        }
+        
+        productId = body.productId;
         groupSku = body.groupSku;
         subSku = body.subSku;
         imageUrls = body.imageUrls;
       } else {
         // Form Data request
+        productId = req.body.productId;
         groupSku = req.body.groupSku;
         subSku = req.body.subSku;
         imageUrls = req.body.imageUrls;
       }
       
-      if (!groupSku && !subSku) {
+      // Validate that we have a way to identify the product
+      if (!productId && !groupSku && !subSku) {
         return res.status(400).json({
-          error: 'Group SKU or Sub SKU is required'
+          error: 'Product identification required',
+          message: 'Provide either productId, groupSku, or subSku to identify the product'
         });
       }
 
@@ -676,16 +647,26 @@ class ProductController {
       }
 
       // Update product attributes if product exists
-      if (groupSku || subSku) {
+      if (productId || groupSku || subSku) {
         try {
-          const product = await prisma.product.findFirst({
-            where: {
-              OR: [
-                { groupSku: groupSku },
-                { subSku: subSku }
-              ]
-            }
-          });
+          let product;
+          
+          if (productId) {
+            // Find by product ID
+            product = await prisma.product.findUnique({
+              where: { id: parseInt(productId) }
+            });
+          } else {
+            // Find by SKU
+            product = await prisma.product.findFirst({
+              where: {
+                OR: [
+                  { groupSku: groupSku },
+                  { subSku: subSku }
+                ]
+              }
+            });
+          }
 
           if (product) {
             const currentAttributes = product.attributes || {};
@@ -738,12 +719,13 @@ class ProductController {
       }
 
       res.json({
-        message: 'Image upload completed',
+        message: 'Product images uploaded successfully',
         summary: {
           uploadedFiles: results.uploadedFiles.length,
           downloadedUrls: results.downloadedUrls.length,
           failed: results.failed.length
         },
+        note: 'Images uploaded for existing product(s)',
         timestamp: new Date().toISOString(),
         results: results
       });
@@ -1056,6 +1038,179 @@ class ProductController {
       console.error('Get product by SKU error:', error);
       res.status(500).json({
         error: 'Failed to retrieve product',
+        details: error.message
+      });
+    }
+  }
+
+  // Bulk product creation - Background processing (for large datasets)
+  static async bulkCreateProducts(req, res) {
+    try {
+      let productsToCreate = [];
+      let fileInfo = null;
+
+      // Check if file was uploaded
+      if (req.file) {
+        console.log('📁 Bulk File Upload Detected:', {
+          filename: req.file.originalname,
+          size: req.file.size,
+          mimetype: req.file.mimetype
+        });
+
+        // Process file upload from memory buffer
+        const FileProcessor = (await import('../utils/fileProcessor.js')).default;
+        const fileData = await FileProcessor.processFileBuffer(req.file.buffer, req.file.originalname);
+        
+        if (fileData.length === 0) {
+          return res.status(400).json({
+            error: 'File is empty or contains no valid data'
+          });
+        }
+
+        // Validate file data
+        const { validData, errors } = FileProcessor.validateProductData(fileData);
+        
+        if (errors.length > 0) {
+          return res.status(400).json({
+            error: 'File validation failed',
+            details: errors
+          });
+        }
+
+        productsToCreate = validData;
+        fileInfo = {
+          originalName: req.file.originalname,
+          storedName: req.file.filename,
+          size: req.file.size,
+          mimetype: req.file.mimetype
+        };
+      } else {
+        // Handle JSON data
+        const { products } = req.body;
+
+        if (!products || !Array.isArray(products)) {
+          return res.status(400).json({
+            error: 'Invalid request format',
+            message: 'Provide "products" array or upload a file'
+          });
+        }
+
+        productsToCreate = products;
+      }
+
+      // For small datasets (< 1000), process immediately
+      if (productsToCreate.length < 1000) {
+        return ProductController.createProduct(req, res);
+      }
+
+      // For large datasets, use background processing
+      const jobResult = await queueService.addBulkProductJob({
+        fileData: productsToCreate,
+        fileInfo,
+        userRole: req.user.role
+      }, req.user.userId);
+
+      res.status(202).json({
+        message: `Large dataset detected (${productsToCreate.length} products). Processing in background.`,
+        jobId: jobResult.jobId,
+        status: jobResult.status,
+        totalProducts: productsToCreate.length,
+        estimatedTime: `${Math.ceil(productsToCreate.length / 100)} minutes`,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Bulk product creation error:', error);
+      res.status(500).json({
+        error: 'Failed to queue bulk product creation',
+        details: error.message
+      });
+    }
+  }
+
+  // Get bulk processing status (for users and admin)
+  static async getBulkStatus(req, res) {
+    try {
+      const { jobId, queueName } = req.query;
+
+      // If specific job ID provided
+      if (jobId && queueName) {
+        const jobStatus = await queueService.getJobStatus(queueName, jobId);
+        return res.json({
+          message: 'Job status retrieved successfully',
+          jobStatus,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // Get user's jobs
+      const userJobs = await queueService.getUserJobs(req.user.userId);
+
+      // If admin, also get queue statistics
+      let queueStats = null;
+      if (req.user.role === 'ADMIN') {
+        queueStats = await queueService.getQueueStats();
+      }
+
+      res.json({
+        message: 'Bulk processing status retrieved successfully',
+        userRole: req.user.role,
+        userJobs: userJobs,
+        ...(queueStats && { queueStats }),
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Get bulk status error:', error);
+      res.status(500).json({
+        error: 'Failed to get bulk processing status',
+        details: error.message
+      });
+    }
+  }
+
+  // Bulk image upload - Background processing (for large datasets)
+  static async bulkUploadImages(req, res) {
+    try {
+      const { imageData } = req.body;
+
+      if (!imageData || !Array.isArray(imageData)) {
+        return res.status(400).json({
+          error: 'Invalid request format',
+          message: 'Provide "imageData" array'
+        });
+      }
+
+      // Validate image data structure
+      const validImageData = imageData.filter(item => {
+        return item.productId && (item.imageUrls || item.imageFiles);
+      });
+
+      if (validImageData.length === 0) {
+        return res.status(400).json({
+          error: 'No valid image data provided',
+          message: 'Each item must have productId and imageUrls or imageFiles'
+        });
+      }
+
+      // For large datasets, use background processing
+      const jobResult = await queueService.addBulkImageJob({
+        imageData: validImageData
+      }, req.user.userId);
+
+      res.status(202).json({
+        message: `Large image dataset detected (${validImageData.length} products). Processing in background.`,
+        jobId: jobResult.jobId,
+        status: jobResult.status,
+        totalProducts: validImageData.length,
+        estimatedTime: `${Math.ceil(validImageData.length / 50)} minutes`,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Bulk image upload error:', error);
+      res.status(500).json({
+        error: 'Failed to queue bulk image upload',
         details: error.message
       });
     }
