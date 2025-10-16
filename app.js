@@ -30,6 +30,7 @@ app.use(cors({
 
 // Serve static files (images)
 app.use('/uploads/images', express.static('uploads/images'));
+app.use('/uploads/downloaded', express.static('uploads/downloaded'));
 
 // Rate limiting
 const limiter = rateLimit({
