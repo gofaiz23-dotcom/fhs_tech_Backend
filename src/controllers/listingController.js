@@ -269,16 +269,16 @@ class ListingController {
       let uploadedGalleryImages = [];
       
       if (req.files) {
-        // Handle mainImage
-        if (req.files.mainImage && req.files.mainImage.length > 0) {
-          const mainImg = req.files.mainImage[0];
+        // Handle mainImageUrl (same field name as JSON!)
+        if (req.files.mainImageUrl && req.files.mainImageUrl.length > 0) {
+          const mainImg = req.files.mainImageUrl[0];
           uploadedMainImage = `/uploads/images/${mainImg.filename}`;
           console.log('📸 Main image uploaded:', uploadedMainImage);
         }
         
-        // Handle gallery images
-        if (req.files.images && req.files.images.length > 0) {
-          uploadedGalleryImages = req.files.images.map(img => `/uploads/images/${img.filename}`);
+        // Handle galleryImages (same field name as JSON!)
+        if (req.files.galleryImages && req.files.galleryImages.length > 0) {
+          uploadedGalleryImages = req.files.galleryImages.map(img => `/uploads/images/${img.filename}`);
           console.log('🖼️ Gallery images uploaded:', uploadedGalleryImages.length);
         }
       }
@@ -373,8 +373,9 @@ class ListingController {
             profitMarginPrice: ListingController.getFieldValue(req.body, 'profitMarginPrice'),
             ecommerceMiscellaneous: ListingController.getFieldValue(req.body, 'ecommerceMiscellaneous'),
             ecommercePrice: ListingController.getFieldValue(req.body, 'ecommercePrice'),
-            mainImageUrl: ListingController.getFieldValue(req.body, 'mainImageUrl'),
-            galleryImages: ListingController.getFieldValue(req.body, 'galleryImages'),
+            // Use uploaded files if available, otherwise use URLs from body
+            mainImageUrl: uploadedMainImage || ListingController.getFieldValue(req.body, 'mainImageUrl'),
+            galleryImages: uploadedGalleryImages.length > 0 ? uploadedGalleryImages : ListingController.getFieldValue(req.body, 'galleryImages'),
             productCounts: ListingController.getFieldValue(req.body, 'productCounts'),
             attributes: attributes || {}
           }];
@@ -722,7 +723,21 @@ class ListingController {
             inventory: inventoryItems
           };
 
-          results.created.push(listingWithInventory);
+          // Add full URLs for response (prepend base URL)
+          const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'http://192.168.0.23:5000';
+          const listingWithFullUrls = {
+            ...listingWithInventory,
+            mainImageUrl: listingWithInventory.mainImageUrl && listingWithInventory.mainImageUrl.startsWith('/uploads/') 
+              ? `${IMAGE_BASE_URL}${listingWithInventory.mainImageUrl}` 
+              : listingWithInventory.mainImageUrl,
+            galleryImages: Array.isArray(listingWithInventory.galleryImages)
+              ? listingWithInventory.galleryImages.map(img => 
+                  img && img.startsWith('/uploads/') ? `${IMAGE_BASE_URL}${img}` : img
+                )
+              : listingWithInventory.galleryImages
+          };
+
+          results.created.push(listingWithFullUrls);
 
           // Log management action
           await ManagementLogger.logListingAction(

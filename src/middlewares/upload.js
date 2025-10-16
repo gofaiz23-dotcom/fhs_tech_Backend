@@ -220,7 +220,8 @@ export const uploadMemory = memoryUpload.single('file');
 export const uploadImage = imageUpload.single('image');
 
 // Multiple image upload middleware - UNLIMITED images
-export const uploadImages = imageUpload.array('images'); // NO LIMIT - Upload as many as you want!
+// Accepts both 'images' (for /images route) and 'galleryImages' (for consistency with JSON)
+export const uploadImages = imageUpload.array('galleryImages', 50); // Support up to 50 images
 
 // Combined upload middleware - supports file (Excel/CSV) + images at the same time
 export const uploadFileAndImages = multer({
@@ -228,7 +229,7 @@ export const uploadFileAndImages = multer({
     destination: (req, file, cb) => {
       if (file.fieldname === 'file') {
         cb(null, excelsheetsDir); // Store Excel/CSV in excelsheets folder
-      } else if (file.fieldname === 'images' || file.fieldname === 'mainImage') {
+      } else if (file.fieldname === 'galleryImages' || file.fieldname === 'mainImageUrl') {
         cb(null, imagesDir); // Store images in images folder
       } else {
         cb(null, uploadsDir);
@@ -238,7 +239,7 @@ export const uploadFileAndImages = multer({
       if (file.fieldname === 'file') {
         const fileName = generateUniqueFileFilename(file.fieldname, file.originalname);
         cb(null, fileName);
-      } else if (file.fieldname === 'images' || file.fieldname === 'mainImage') {
+      } else if (file.fieldname === 'galleryImages' || file.fieldname === 'mainImageUrl') {
         const fileName = generateUniqueFilename(file.fieldname, file.originalname);
         cb(null, fileName);
       } else {
@@ -250,7 +251,7 @@ export const uploadFileAndImages = multer({
     if (file.fieldname === 'file') {
       // Excel/CSV files
       fileFilter(req, file, cb);
-    } else if (file.fieldname === 'images' || file.fieldname === 'mainImage') {
+    } else if (file.fieldname === 'galleryImages' || file.fieldname === 'mainImageUrl') {
       // Image files
       imageFilter(req, file, cb);
     } else {
@@ -262,8 +263,8 @@ export const uploadFileAndImages = multer({
   }
 }).fields([
   { name: 'file', maxCount: 1 },
-  { name: 'mainImage', maxCount: 1 },
-  { name: 'images', maxCount: 50 }
+  { name: 'mainImageUrl', maxCount: 1 },
+  { name: 'galleryImages', maxCount: 50 }
 ]);
 
 // Conditional upload middleware - handles both JSON and Form Data

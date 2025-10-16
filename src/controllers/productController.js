@@ -185,20 +185,30 @@ class ProductController {
       let uploadedMainImage = null;
       let uploadedGalleryImages = [];
       
+      console.log('📁 Checking for uploaded files:', {
+        hasFiles: !!req.files,
+        fileKeys: req.files ? Object.keys(req.files) : []
+      });
+      
       if (req.files) {
-        // Handle mainImage
-        if (req.files.mainImage && req.files.mainImage.length > 0) {
-          const mainImg = req.files.mainImage[0];
+        // Handle mainImageUrl (same field name as JSON!)
+        if (req.files.mainImageUrl && req.files.mainImageUrl.length > 0) {
+          const mainImg = req.files.mainImageUrl[0];
           uploadedMainImage = `/uploads/images/${mainImg.filename}`;
           console.log('📸 Main image uploaded:', uploadedMainImage);
         }
         
-        // Handle gallery images
-        if (req.files.images && req.files.images.length > 0) {
-          uploadedGalleryImages = req.files.images.map(img => `/uploads/images/${img.filename}`);
-          console.log('🖼️ Gallery images uploaded:', uploadedGalleryImages.length);
+        // Handle galleryImages (same field name as JSON!)
+        if (req.files.galleryImages && req.files.galleryImages.length > 0) {
+          uploadedGalleryImages = req.files.galleryImages.map(img => `/uploads/images/${img.filename}`);
+          console.log('🖼️ Gallery images uploaded:', uploadedGalleryImages.length, uploadedGalleryImages);
         }
       }
+      
+      console.log('✅ Captured uploaded images:', {
+        mainImageUrl: uploadedMainImage,
+        galleryCount: uploadedGalleryImages.length
+      });
 
       // Check if Excel/CSV file was uploaded
       if (req.files && req.files.file && req.files.file.length > 0) {
@@ -320,8 +330,9 @@ class ProductController {
             profitMarginPrice: profitMarginPrice,
             ecommerceMiscellaneous: ecommerceMiscellaneous,
             ecommercePrice: ecommercePrice,
-            mainImageUrl: mainImageUrl,
-            galleryImages: galleryImages,
+            // Use uploaded files if available, otherwise use URLs from body
+            mainImageUrl: uploadedMainImage || mainImageUrl,
+            galleryImages: uploadedGalleryImages.length > 0 ? uploadedGalleryImages : galleryImages,
             attributes: attributes || {}
           }];
         } else {
@@ -530,7 +541,21 @@ class ProductController {
             attributes: finalAttributes
           });
 
-          results.created.push(product);
+          // Add full URLs for response (prepend base URL)
+          const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'http://192.168.0.23:5000';
+          const productWithFullUrls = {
+            ...product,
+            mainImageUrl: product.mainImageUrl && product.mainImageUrl.startsWith('/uploads/') 
+              ? `${IMAGE_BASE_URL}${product.mainImageUrl}` 
+              : product.mainImageUrl,
+            galleryImages: Array.isArray(product.galleryImages)
+              ? product.galleryImages.map(img => 
+                  img && img.startsWith('/uploads/') ? `${IMAGE_BASE_URL}${img}` : img
+                )
+              : product.galleryImages
+          };
+
+          results.created.push(productWithFullUrls);
 
           // Log management action
           await ManagementLogger.logProductAction(
