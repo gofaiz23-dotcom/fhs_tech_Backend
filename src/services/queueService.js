@@ -3,7 +3,6 @@ import Redis from 'ioredis';
 import { v4 as uuidv4 } from 'uuid';
 import ProductModel from '../models/Product.js';
 import ManagementLogger from '../utils/managementLogger.js';
-import ImageService from '../services/imageService.js';
 import { prisma } from '../config/database.js';
 
 class QueueService {
@@ -484,6 +483,9 @@ class QueueService {
     try {
       console.log(`🚀 Starting bulk image processing - Job ID: ${jobId}`);
       
+      const { processImages } = await import('../utils/imageDownloader.js');
+      const ProductModel = (await import('../models/Product.js')).default;
+      
       const batchSize = 50;
       const totalRecords = imageData.length;
       let processedCount = 0;
@@ -496,7 +498,53 @@ class QueueService {
         
         for (const imageItem of batch) {
           try {
-            // Process image upload logic here
+            const { productId, imageUrls } = imageItem;
+            
+            if (!productId) {
+              throw new Error('Product ID is required');
+            }
+            
+            // Find the product
+            const product = await ProductModel.findById(parseInt(productId));
+            if (!product) {
+              throw new Error(`Product not found: ${productId}`);
+            }
+            
+            // Download images from URLs
+            if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
+              console.log(`📥 Downloading ${imageUrls.length} images for product ${productId}`);
+              
+              const downloadedPaths = await processImages(imageUrls);
+              
+              // Filter successful downloads
+              const successfulDownloads = downloadedPaths.filter(path => 
+                path && !path.startsWith('http')
+              );
+              
+              if (successfulDownloads.length > 0) {
+                // Update product attributes with downloaded images
+                const currentAttributes = product.attributes || {};
+                const existingImages = currentAttributes.images || [];
+                
+                const newImages = successfulDownloads.map((path, index) => ({
+                  type: 'downloaded',
+                  originalUrl: imageUrls[index],
+                  filename: path.split('/').pop(),
+                  url: path,
+                  uploadedAt: new Date().toISOString(),
+                  permanent: true
+                }));
+                
+                currentAttributes.images = [...existingImages, ...newImages];
+                
+                await ProductModel.update(product.id, {
+                  attributes: currentAttributes
+                });
+                
+                console.log(`✅ Downloaded ${successfulDownloads.length}/${imageUrls.length} images for product ${productId}`);
+              }
+            }
+            
             successCount++;
           } catch (error) {
             errorCount++;
@@ -504,6 +552,7 @@ class QueueService {
               productId: imageItem.productId,
               error: error.message
             });
+            console.error(`❌ Failed to process images for product ${imageItem.productId}:`, error.message);
           }
           processedCount++;
         }

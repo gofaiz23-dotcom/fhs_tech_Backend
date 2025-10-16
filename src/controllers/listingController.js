@@ -2,6 +2,7 @@ import ListingModel from '../models/Listing.js';
 import InventoryModel from '../models/Inventory.js';
 import ManagementLogger from '../utils/managementLogger.js';
 import { prisma } from '../config/database.js';
+import { processImage, processImages } from '../utils/imageDownloader.js';
 
 class ListingController {
   // Helper method to normalize field names (case-insensitive)
@@ -185,6 +186,45 @@ class ListingController {
         userId: req.user.userId
       });
 
+      // Get base URL from environment (default: http://192.168.0.23:5000)
+      const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'http://192.168.0.23:5000';
+
+      // Filter base64 images and prepend base URL to local paths
+      const cleanListings = listingsWithInventoryStats.map(listing => {
+        const cleanedListing = { ...listing };
+        
+        // Process mainImageUrl
+        if (cleanedListing.mainImageUrl) {
+          if (cleanedListing.mainImageUrl.startsWith('data:image/')) {
+            // Remove base64
+            cleanedListing.mainImageUrl = null;
+          } else if (cleanedListing.mainImageUrl.startsWith('/uploads/')) {
+            // Prepend base URL to local path
+            cleanedListing.mainImageUrl = `${IMAGE_BASE_URL}${cleanedListing.mainImageUrl}`;
+          }
+          // External URLs remain unchanged
+        }
+        
+        // Process galleryImages
+        if (Array.isArray(cleanedListing.galleryImages)) {
+          cleanedListing.galleryImages = cleanedListing.galleryImages
+            .filter(img => img && !img.startsWith('data:image/')) // Remove base64
+            .map(img => {
+              // Prepend base URL to local paths
+              if (img.startsWith('/uploads/')) {
+                return `${IMAGE_BASE_URL}${img}`;
+              }
+              return img; // External URLs remain unchanged
+            });
+          
+          if (cleanedListing.galleryImages.length === 0) {
+            cleanedListing.galleryImages = null;
+          }
+        }
+        
+        return cleanedListing;
+      });
+
       res.json({
         message: 'Listings retrieved successfully',
         userAccess: {
@@ -193,7 +233,7 @@ class ListingController {
           email: req.user.email
         },
         timestamp: new Date().toISOString(),
-        listings: listingsWithInventoryStats,  // Use computed listings
+        listings: cleanListings,  // Use cleaned listings
         pagination: result.pagination,
         duplicateStats: {
           totalDuplicates: totalDuplicateListings,
@@ -584,19 +624,39 @@ class ListingController {
             continue;
           }
 
-          // Process attributes
+          // Process attributes - keep all values (including numbers, arrays, nested objects)
           let finalAttributes = { ...listingData.attributes };
+          
+          // Only remove truly empty values (null, undefined, empty strings)
           Object.keys(finalAttributes).forEach(key => {
             const value = finalAttributes[key];
-            if (value === null || value === undefined || value === '' || 
-                (Array.isArray(value) && value.length === 0) ||
-                (typeof value === 'object' && Object.keys(value).length === 0)) {
+            // Only delete if null, undefined, or empty string
+            // Keep: numbers (0, 3.7), arrays (even empty), objects, booleans
+            if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) {
               delete finalAttributes[key];
             }
           });
 
           // STEP 6: Create listing with data from request (NOT from product)
           // Product is only used for validation, listing uses its own data
+          
+          // Process images: download URLs or use uploaded files
+          let finalMainImage = uploadedMainImage; // Prioritize uploaded file
+          let finalGalleryImages = uploadedGalleryImages.length > 0 ? uploadedGalleryImages : null;
+          
+          // If no uploaded file, check if URL was provided and download it
+          if (!finalMainImage && listingData.mainImageUrl) {
+            finalMainImage = await processImage(listingData.mainImageUrl);
+          }
+          
+          // Process gallery images: download URLs if no files uploaded
+          if (!finalGalleryImages && listingData.galleryImages && Array.isArray(listingData.galleryImages)) {
+            const downloadedGallery = await processImages(listingData.galleryImages);
+            if (downloadedGallery.length > 0) {
+              finalGalleryImages = downloadedGallery;
+            }
+          }
+
           const listing = await ListingModel.create({
             productId: product.id,  // Link to product (for validation only)
             brandId: brand.id,
@@ -616,8 +676,8 @@ class ListingController {
             profitMarginPrice: listingData.profitMarginPrice || 0,
             ecommerceMiscellaneous: listingData.ecommerceMiscellaneous || 0,
             ecommercePrice: listingData.ecommercePrice || 0,
-            mainImageUrl: listingData.mainImageUrl || uploadedMainImage || null,
-            galleryImages: listingData.galleryImages || (uploadedGalleryImages.length > 0 ? uploadedGalleryImages : null),
+            mainImageUrl: finalMainImage,
+            galleryImages: finalGalleryImages,
             productCounts: listingData.productCounts || null,  // JSONB mapping subSku to quantity
             attributes: finalAttributes
           });

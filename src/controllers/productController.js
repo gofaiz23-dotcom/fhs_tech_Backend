@@ -1,8 +1,8 @@
 import ProductModel from '../models/Product.js';
 import ManagementLogger from '../utils/managementLogger.js';
-import ImageService from '../services/imageService.js';
 import queueService from '../services/queueService.js';
 import { prisma } from '../config/database.js';
+import { processImage, processImages } from '../utils/imageDownloader.js';
 
 class ProductController {
   // Helper method to normalize field names (case-insensitive)
@@ -106,6 +106,45 @@ class ProductController {
         userId: req.user.userId
       });
 
+      // Get base URL from environment (default: http://192.168.0.23:5000)
+      const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'http://192.168.0.23:5000';
+      
+      // Filter base64 images and prepend base URL to local paths
+      const cleanProducts = result.products.map(product => {
+        const cleanedProduct = { ...product };
+        
+        // Process mainImageUrl
+        if (cleanedProduct.mainImageUrl) {
+          if (cleanedProduct.mainImageUrl.startsWith('data:image/')) {
+            // Remove base64
+            cleanedProduct.mainImageUrl = null;
+          } else if (cleanedProduct.mainImageUrl.startsWith('/uploads/')) {
+            // Prepend base URL to local path
+            cleanedProduct.mainImageUrl = `${IMAGE_BASE_URL}${cleanedProduct.mainImageUrl}`;
+          }
+          // External URLs remain unchanged
+        }
+        
+        // Process galleryImages
+        if (Array.isArray(cleanedProduct.galleryImages)) {
+          cleanedProduct.galleryImages = cleanedProduct.galleryImages
+            .filter(img => img && !img.startsWith('data:image/')) // Remove base64
+            .map(img => {
+              // Prepend base URL to local paths
+              if (img.startsWith('/uploads/')) {
+                return `${IMAGE_BASE_URL}${img}`;
+              }
+              return img; // External URLs remain unchanged
+            });
+          
+          if (cleanedProduct.galleryImages.length === 0) {
+            cleanedProduct.galleryImages = null;
+          }
+        }
+        
+        return cleanedProduct;
+      });
+
       res.json({
         message: 'Products retrieved successfully',
         userAccess: {
@@ -114,7 +153,7 @@ class ProductController {
           email: req.user.email
         },
         timestamp: new Date().toISOString(),
-        products: result.products,
+        products: cleanProducts,
         pagination: result.pagination
       });
     } catch (error) {
@@ -438,6 +477,23 @@ class ProductController {
             msrp: msrp
           });
           
+          // Process images: download URLs or use uploaded files
+          let finalMainImage = uploadedMainImage; // Prioritize uploaded file
+          let finalGalleryImages = uploadedGalleryImages.length > 0 ? uploadedGalleryImages : null;
+          
+          // If no uploaded file, check if URL was provided and download it
+          if (!finalMainImage && productData.mainImageUrl) {
+            finalMainImage = await processImage(productData.mainImageUrl);
+          }
+          
+          // Process gallery images: download URLs if no files uploaded
+          if (!finalGalleryImages && productData.galleryImages && Array.isArray(productData.galleryImages)) {
+            const downloadedGallery = await processImages(productData.galleryImages);
+            if (downloadedGallery.length > 0) {
+              finalGalleryImages = downloadedGallery;
+            }
+          }
+
           const product = await ProductModel.create({
             brandId: brand.id,
             title: productData.title,
@@ -458,8 +514,8 @@ class ProductController {
             ecommerceMiscellaneous: productData.ecommerceMiscellaneous || 0,
             ecommercePrice: productData.ecommercePrice || 0,
             // Image columns (optional during creation)
-            mainImageUrl: productData.mainImageUrl || uploadedMainImage || null,
-            galleryImages: productData.galleryImages || (uploadedGalleryImages.length > 0 ? uploadedGalleryImages : null),
+            mainImageUrl: finalMainImage,
+            galleryImages: finalGalleryImages,
             attributes: finalAttributes
           });
 
@@ -803,33 +859,44 @@ class ProductController {
         console.log('🌐 Processing Image URLs:', imageUrls);
         
         const urls = typeof imageUrls === 'string' ? imageUrls.split(',').map(url => url.trim()).filter(url => url) : imageUrls;
-        const productSku = groupSku || subSku;
         
         console.log(`📊 Total URLs to process: ${urls.length} - UNLIMITED SUPPORT!`);
         
         try {
-          const downloadResults = await ImageService.downloadMultipleImages(urls, productSku);
+          // Download all URLs using the new downloader utility
+          const downloadedPaths = await processImages(urls);
           
-          results.downloadedUrls = downloadResults.successful.map(item => ({
-            originalUrl: item.originalUrl,
-            filename: item.filename,
-            url: item.url,
-            localPath: item.localPath,
-            permanent: true // Flag to indicate permanent storage
-          }));
-          
-          results.failed = results.failed.concat(downloadResults.failed.map(item => ({
-            type: 'url',
-            url: item.originalUrl,
-            error: item.error
-          })));
+          // Create results array with downloaded images
+          for (let i = 0; i < urls.length; i++) {
+            const url = urls[i];
+            const downloadedPath = downloadedPaths[i];
+            
+            if (downloadedPath && !downloadedPath.startsWith('http')) {
+              // Successfully downloaded
+              const filename = downloadedPath.split('/').pop();
+              results.downloadedUrls.push({
+                originalUrl: url,
+                filename: filename,
+                url: downloadedPath,
+                localPath: downloadedPath,
+                permanent: true
+              });
+            } else {
+              // Download failed
+              results.failed.push({
+                type: 'url',
+                url: url,
+                error: 'Failed to download image'
+              });
+            }
+          }
           
           // Store image information in product attributes for tracking
-          if (downloadResults.successful.length > 0 && existingProduct) {
+          if (results.downloadedUrls.length > 0 && existingProduct) {
             const currentAttributes = existingProduct.attributes || {};
             const existingImages = currentAttributes.images || [];
             
-            const newImages = downloadResults.successful.map(item => ({
+            const newImages = results.downloadedUrls.map(item => ({
               type: 'downloaded',
               originalUrl: item.originalUrl,
               filename: item.filename,
