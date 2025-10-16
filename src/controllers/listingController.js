@@ -7,16 +7,18 @@ import { processImage, processImages } from '../utils/imageDownloader.js';
 class ListingController {
   // Helper method to normalize field names (case-insensitive)
   static normalizeFieldName(obj, fieldName) {
+    if (!obj) return null;
+    
     const lowerFieldName = fieldName.toLowerCase();
     
     // Check for exact match first
-    if (obj.hasOwnProperty(fieldName)) {
+    if (Object.prototype.hasOwnProperty.call(obj, fieldName)) {
       return fieldName;
     }
     
     // Check for case-insensitive match
     for (const key in obj) {
-      if (key.toLowerCase() === lowerFieldName) {
+      if (Object.prototype.hasOwnProperty.call(obj, key) && key.toLowerCase() === lowerFieldName) {
         return key;
       }
     }
@@ -643,20 +645,26 @@ class ListingController {
           // STEP 6: Create listing with data from request (NOT from product)
           // Product is only used for validation, listing uses its own data
           
-          // Process images: download URLs or use uploaded files
-          let finalMainImage = uploadedMainImage; // Prioritize uploaded file
-          let finalGalleryImages = uploadedGalleryImages.length > 0 ? uploadedGalleryImages : null;
+          // Process images: EITHER files OR URLs (not both)
+          let finalMainImage = null;
+          let finalGalleryImages = null;
           
-          // If no uploaded file, check if URL was provided and download it
-          if (!finalMainImage && listingData.mainImageUrl) {
-            finalMainImage = await processImage(listingData.mainImageUrl);
-          }
-          
-          // Process gallery images: download URLs if no files uploaded
-          if (!finalGalleryImages && listingData.galleryImages && Array.isArray(listingData.galleryImages)) {
-            const downloadedGallery = await processImages(listingData.galleryImages);
-            if (downloadedGallery.length > 0) {
-              finalGalleryImages = downloadedGallery;
+          // If files uploaded, use files ONLY (ignore URLs)
+          if (uploadedMainImage || uploadedGalleryImages.length > 0) {
+            finalMainImage = uploadedMainImage;
+            finalGalleryImages = uploadedGalleryImages.length > 0 ? uploadedGalleryImages : null;
+          } 
+          // If no files uploaded, check for URLs and download them
+          else {
+            if (listingData.mainImageUrl) {
+              finalMainImage = await processImage(listingData.mainImageUrl);
+            }
+            
+            if (listingData.galleryImages && Array.isArray(listingData.galleryImages)) {
+              const downloadedGallery = await processImages(listingData.galleryImages);
+              if (downloadedGallery.length > 0) {
+                finalGalleryImages = downloadedGallery;
+              }
             }
           }
 
