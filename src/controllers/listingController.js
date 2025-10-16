@@ -219,19 +219,42 @@ class ListingController {
         duplicates: []
       };
 
-      // Check if file was uploaded
-      if (req.file) {
+      // Process uploaded image files first
+      let uploadedMainImage = null;
+      let uploadedGalleryImages = [];
+      
+      if (req.files) {
+        // Handle mainImage
+        if (req.files.mainImage && req.files.mainImage.length > 0) {
+          const mainImg = req.files.mainImage[0];
+          uploadedMainImage = `/uploads/images/${mainImg.filename}`;
+          console.log('📸 Main image uploaded:', uploadedMainImage);
+        }
+        
+        // Handle gallery images
+        if (req.files.images && req.files.images.length > 0) {
+          uploadedGalleryImages = req.files.images.map(img => `/uploads/images/${img.filename}`);
+          console.log('🖼️ Gallery images uploaded:', uploadedGalleryImages.length);
+        }
+      }
+
+      // Check if Excel/CSV file was uploaded
+      if (req.files && req.files.file && req.files.file.length > 0) {
+        const file = req.files.file[0];
         console.log('📁 File Upload Detected:', {
-          filename: req.file.originalname,
-          storedFilename: req.file.filename,
-          path: req.file.path,
-          size: req.file.size,
-          mimetype: req.file.mimetype
+          filename: file.originalname,
+          storedFilename: file.filename,
+          path: file.path,
+          size: file.size,
+          mimetype: file.mimetype
         });
 
-        // Process file upload from memory buffer
+        // Process file upload from disk
         const FileProcessor = (await import('../utils/fileProcessor.js')).default;
-        const fileData = await FileProcessor.processFileBuffer(req.file.buffer, req.file.originalname);
+        const fs = await import('fs');
+        
+        const fileBuffer = fs.readFileSync(file.path);
+        const fileData = await FileProcessor.processFileBuffer(fileBuffer, file.originalname);
         
         if (fileData.length === 0) {
           return res.status(400).json({
@@ -593,8 +616,8 @@ class ListingController {
             profitMarginPrice: listingData.profitMarginPrice || 0,
             ecommerceMiscellaneous: listingData.ecommerceMiscellaneous || 0,
             ecommercePrice: listingData.ecommercePrice || 0,
-            mainImageUrl: listingData.mainImageUrl || null,
-            galleryImages: listingData.galleryImages || null,
+            mainImageUrl: listingData.mainImageUrl || uploadedMainImage || null,
+            galleryImages: listingData.galleryImages || (uploadedGalleryImages.length > 0 ? uploadedGalleryImages : null),
             productCounts: listingData.productCounts || null,  // JSONB mapping subSku to quantity
             attributes: finalAttributes
           });
@@ -661,13 +684,23 @@ class ListingController {
         results: results
       };
 
-      if (req.file) {
+      if (req.files && req.files.file && req.files.file.length > 0) {
+        const file = req.files.file[0];
         response.fileInfo = {
-          originalName: req.file.originalname,
-          storedName: req.file.filename,
-          path: req.file.path,
-          size: req.file.size,
-          mimetype: req.file.mimetype
+          originalName: file.originalname,
+          storedName: file.filename,
+          path: file.path,
+          size: file.size,
+          mimetype: file.mimetype
+        };
+      }
+      
+      // Add image upload info
+      if (uploadedMainImage || uploadedGalleryImages.length > 0) {
+        response.uploadedImages = {
+          mainImage: uploadedMainImage,
+          galleryImages: uploadedGalleryImages,
+          totalImages: (uploadedMainImage ? 1 : 0) + uploadedGalleryImages.length
         };
       }
 

@@ -137,27 +137,48 @@ class ProductController {
         duplicates: []
       };
 
-      // Check if file was uploaded
-      if (req.file) {
+      // Process uploaded image files first
+      let uploadedMainImage = null;
+      let uploadedGalleryImages = [];
+      
+      if (req.files) {
+        // Handle mainImage
+        if (req.files.mainImage && req.files.mainImage.length > 0) {
+          const mainImg = req.files.mainImage[0];
+          uploadedMainImage = `/uploads/images/${mainImg.filename}`;
+          console.log('📸 Main image uploaded:', uploadedMainImage);
+        }
+        
+        // Handle gallery images
+        if (req.files.images && req.files.images.length > 0) {
+          uploadedGalleryImages = req.files.images.map(img => `/uploads/images/${img.filename}`);
+          console.log('🖼️ Gallery images uploaded:', uploadedGalleryImages.length);
+        }
+      }
+
+      // Check if Excel/CSV file was uploaded
+      if (req.files && req.files.file && req.files.file.length > 0) {
+        const file = req.files.file[0];
         console.log('📁 File Upload Detected:', {
-          filename: req.file.originalname,
-          storedFilename: req.file.filename,
-          path: req.file.path,
-          size: req.file.size,
-          mimetype: req.file.mimetype
+          filename: file.originalname,
+          storedFilename: file.filename,
+          path: file.path,
+          size: file.size,
+          mimetype: file.mimetype
         });
 
-        // Process file upload from memory buffer
+        // Process file upload from disk
         const FileProcessor = (await import('../utils/fileProcessor.js')).default;
+        const fs = await import('fs');
         
         console.log('🔍 File Processing Debug:', {
-          filename: req.file.originalname,
-          bufferLength: req.file.buffer ? req.file.buffer.length : 'undefined',
-          bufferType: typeof req.file.buffer,
-          mimetype: req.file.mimetype
+          filename: file.originalname,
+          path: file.path
         });
         
-        const fileData = await FileProcessor.processFileBuffer(req.file.buffer, req.file.originalname);
+        // Read file buffer from disk
+        const fileBuffer = fs.readFileSync(file.path);
+        const fileData = await FileProcessor.processFileBuffer(fileBuffer, file.originalname);
         
         console.log('📊 File Data Processed:', {
           totalRows: fileData.length,
@@ -437,8 +458,8 @@ class ProductController {
             ecommerceMiscellaneous: productData.ecommerceMiscellaneous || 0,
             ecommercePrice: productData.ecommercePrice || 0,
             // Image columns (optional during creation)
-            mainImageUrl: productData.mainImageUrl || null,
-            galleryImages: productData.galleryImages || null,
+            mainImageUrl: productData.mainImageUrl || uploadedMainImage || null,
+            galleryImages: productData.galleryImages || (uploadedGalleryImages.length > 0 ? uploadedGalleryImages : null),
             attributes: finalAttributes
           });
 
