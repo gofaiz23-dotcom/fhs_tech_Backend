@@ -8,6 +8,7 @@ import productRoutes from './productRoutes.js';
 import productPricingRoutes from './productPricingRoutes.js';
 import listingRoutes from './listingRoutes.js';
 import settingRoutes from './settingRoutes.js';
+import inventoryRoutes from './inventoryRoutes.js';
 import permissionRoutes from './permissionRoutes.js';
 import managementHistoryRoutes from './managementHistoryRoutes.js';
 import userActivityRoutes from './userActivityRoutes.js';
@@ -25,6 +26,7 @@ router.use('/products', productRoutes);
 router.use('/products/pricing', productPricingRoutes);
 router.use('/listings', listingRoutes);
 router.use('/settings', settingRoutes);
+router.use('/inventory', inventoryRoutes);
 router.use('/users', permissionRoutes);
 router.use('/management', managementHistoryRoutes);
 router.use('/activities', userActivityRoutes);
@@ -91,6 +93,7 @@ router.get('/', (req, res) => {
       products: '/api/products',
       listings: '/api/listings',
       settings: '/api/settings',
+      inventory: '/api/inventory',
       permissions: '/api/users',
       management: '/api/management',
       activities: '/api/activities',

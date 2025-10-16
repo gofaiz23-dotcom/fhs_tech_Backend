@@ -1,4 +1,5 @@
 import ListingModel from '../models/Listing.js';
+import InventoryModel from '../models/Inventory.js';
 import ManagementLogger from '../utils/managementLogger.js';
 import { prisma } from '../config/database.js';
 
@@ -87,12 +88,66 @@ class ListingController {
         filters: filters
       });
 
+      // Get settings for inventory thresholds
+      let settings = await prisma.setting.findFirst();
+      if (!settings) {
+        // Create default settings if not exists
+        settings = await prisma.setting.create({
+          data: {
+            inventoryConfig: {
+              minValue: 3
+            }
+          }
+        });
+      }
+      
+      const inventoryConfig = settings.inventoryConfig;
+      const minValue = inventoryConfig.minValue || 3;
+
       const result = await ListingModel.findAll(req.user.userId, req.user.role, page, limit, filters);
+
+      // Add computed inventory fields to each listing
+      const listingsWithInventoryStats = result.listings.map(listing => {
+        const inventoryArray = [];
+        let minQuantity = 0;
+        let status = 'Out of Stock';  // Default status
+        
+        if (listing.inventory && listing.inventory.length > 0) {
+          // Extract quantities from inventory
+          const quantities = listing.inventory.map(inv => inv.quantity);
+          inventoryArray.push(...quantities);
+          
+          // Calculate minimum quantity
+          if (quantities.length === 1) {
+            // Single subSku - show direct value
+            minQuantity = quantities[0];
+          } else {
+            // Multiple subSkus - show minimum value
+            minQuantity = Math.min(...quantities);
+          }
+        }
+        
+        // Determine stock status based on settings
+        if (minQuantity > minValue) {
+          status = 'In Stock';
+        } else if (minQuantity === minValue) {
+          status = 'Warning';  // Low stock - equal to min
+        } else {
+          status = 'Out of Stock';  // Less than min
+        }
+        
+        return {
+          ...listing,
+          inventoryArray: inventoryArray,  // Array of all quantities
+          quantity: minQuantity,            // Min quantity (or direct if single)
+          status: status                    // Stock status
+        };
+      });
 
       // Calculate duplicate statistics
       const duplicateGroups = {};
       
-      result.listings.forEach(listing => {
+      listingsWithInventoryStats.forEach(listing => {
         const key = `${listing.sku}|${listing.subSku || ''}`;
         if (!duplicateGroups[key]) {
           duplicateGroups[key] = {
@@ -138,7 +193,7 @@ class ListingController {
           email: req.user.email
         },
         timestamp: new Date().toISOString(),
-        listings: result.listings,
+        listings: listingsWithInventoryStats,  // Use computed listings
         pagination: result.pagination,
         duplicateStats: {
           totalDuplicates: totalDuplicateListings,
@@ -207,7 +262,7 @@ class ListingController {
             brandId: ListingController.getFieldValue(listing, 'brandId'),
             brandName: ListingController.getFieldValue(listing, 'brandName'),
             title: ListingController.getFieldValue(listing, 'title')?.trim(),
-            groupSku: ListingController.getFieldValue(listing, 'groupSku')?.trim(),
+            sku: ListingController.getFieldValue(listing, 'sku')?.trim(),
             subSku: ListingController.getFieldValue(listing, 'subSku')?.trim(),
             category: ListingController.getFieldValue(listing, 'category')?.trim(),
             collectionName: ListingController.getFieldValue(listing, 'collectionName')?.trim(),
@@ -226,15 +281,17 @@ class ListingController {
             productCounts: ListingController.getFieldValue(listing, 'productCounts'),
             attributes: ListingController.getFieldValue(listing, 'attributes') || {}
           }));
-        } else if (title && groupSku) {
-          // Single listing
+        } else if (title && (ListingController.getFieldValue(req.body, 'sku'))) {
+          // Single listing - extract sku field (case-insensitive)
+          const skuValue = ListingController.getFieldValue(req.body, 'sku');
+          
           listingsToCreate = [{
             productId: productId,
             productGroupSku: productGroupSku,
             brandId: ListingController.getFieldValue(req.body, 'brandId'),
             brandName: ListingController.getFieldValue(req.body, 'brandName'),
             title: title.trim(),
-            groupSku: groupSku.trim(),
+            sku: skuValue?.trim() || '',
             subSku: subSku?.trim() || '',
             category: category?.trim() || '',
             collectionName: collectionName?.trim() || '',
@@ -258,11 +315,11 @@ class ListingController {
             error: 'Invalid request format',
             message: 'Provide either "listings" array, single listing data, or upload a file',
             required: {
-              singleListing: ['title', 'groupSku (used to find product)', 'productId or productGroupSku (optional)'],
+              singleListing: ['title', 'sku', 'subSku (validates in product)'],
               multipleListings: ['listings array'],
-              fileUpload: ['upload Excel/CSV file with groupSku column']
+              fileUpload: ['upload Excel/CSV file with sku and subSku columns']
             },
-            note: 'For Excel uploads: groupSku will be used to find the matching product in products table'
+            note: 'subSku must exist in product table. Case-insensitive matching (sku, SKU, sKU all work)'
           });
         }
       }
@@ -273,30 +330,37 @@ class ListingController {
       // Process each listing
       for (const listingData of listingsToCreate) {
         try {
-          // STEP 0: Track duplicates (but don't skip them - create all)
-          const duplicateKey = `${listingData.sku || listingData.groupSku}|${listingData.subSku || ''}`;
+          // STEP 0: Validate sku is provided (required field)
+          if (!listingData.sku || listingData.sku.trim() === '') {
+            results.errors.push({
+              title: listingData.title,
+              error: 'SKU is required and cannot be empty'
+            });
+            continue;
+          }
+          
+          // Track duplicates (but don't skip them - create all)
+          const duplicateKey = `${listingData.sku}|${listingData.subSku || ''}`;
           if (processedListings.has(duplicateKey)) {
             const count = processedListings.get(duplicateKey);
             processedListings.set(duplicateKey, count + 1);
             // Log duplicate but still create it
             results.duplicates.push({
               title: listingData.title,
-              sku: listingData.sku || listingData.groupSku,
+              sku: listingData.sku,
               subSku: listingData.subSku,
-              note: `Duplicate: Same sku "${listingData.sku || listingData.groupSku}" and subSku "${listingData.subSku || ''}"`
+              note: `Duplicate: Same sku "${listingData.sku}" and subSku "${listingData.subSku || ''}"`
             });
             // Don't skip - continue to create the listing
           } else {
             processedListings.set(duplicateKey, 1);
           }
           
-          // STEP 1: Find product by subSku (if provided) or search all products
+          // STEP 1: Find product by subSku (if provided) or by productId
           let product = null;
-          let shouldValidateSubSku = false;
           
           if (listingData.subSku && listingData.subSku.trim() !== '') {
             // SubSku provided - find product that contains this subSku (case-insensitive)
-            shouldValidateSubSku = true;
             const listingSubSkus = listingData.subSku.split(',').map(s => s.trim()).filter(s => s);
             
             console.log('🔍 Searching for product with subSkus (case-insensitive):', listingSubSkus);
@@ -322,6 +386,23 @@ class ListingController {
                 );
                 if (found) {
                   product = prod;
+                  
+                  // Validate ALL listing subSkus exist in product (case-insensitive)
+                  const invalidSubSkus = listingSubSkus.filter(lsku => 
+                    !productSubSkus.some(psku => psku.toLowerCase() === lsku.toLowerCase())
+                  );
+                  
+                  if (invalidSubSkus.length > 0) {
+                    results.errors.push({
+                      title: listingData.title,
+                      sku: listingData.sku,
+                      subSku: listingData.subSku,
+                      error: `SubSKU validation failed: "${invalidSubSkus.join(', ')}" not found in product. Product has: ${product.subSku || 'none'}`
+                    });
+                    product = null; // Reset product
+                    break;
+                  }
+                  
                   break;
                 }
               }
@@ -330,49 +411,16 @@ class ListingController {
             if (!product) {
               results.errors.push({
                 title: listingData.title,
-                sku: listingData.sku || listingData.groupSku,
+                sku: listingData.sku,
                 subSku: listingData.subSku,
                 error: `Product not found with subSku: "${listingData.subSku}". Listing subSku must exist in product's subSku field!`
               });
               continue;
             }
-            
-            // Validate ALL listing subSkus exist in product
-          const productSubSkus = product.subSku ? product.subSku.split(',').map(sku => sku.trim()).filter(sku => sku) : [];
-          
-          console.log('🔍 Validating SubSKUs (case-insensitive):', {
-            listingSubSkus: listingSubSkus,
-            productSubSkus: productSubSkus
-          });
-          
-          // Check if ALL listing subSkus exist in product's subSku list (case-insensitive)
-          const invalidSubSkus = listingSubSkus.filter(lsku => 
-            !productSubSkus.some(psku => psku.toLowerCase() === lsku.toLowerCase())
-          );
-          
-          if (invalidSubSkus.length > 0) {
-            console.log('❌ SubSKU Validation Failed:', {
-              listingSubSkus: listingSubSkus,
-              productSubSkus: productSubSkus,
-              invalidSubSkus: invalidSubSkus
-            });
-            
-            results.errors.push({
-              title: listingData.title,
-              sku: listingData.sku || listingData.groupSku,
-              subSku: listingData.subSku,
-              error: `SubSKU validation failed: "${invalidSubSkus.join(', ')}" not found in product. Product has: ${product.subSku || 'none'}. All listing subSkus must exist in product's subSku field!`
-            });
-            continue;
-          }
-          
-          console.log('✅ SubSKU Validation Passed: All subSkus exist in product (case-insensitive)');
           } else {
-            // No subSku provided - we'll copy from product later
-            // For now, just find any product to link to (can be first product)
+            // No subSku provided - find product by productId
             console.log('ℹ️ No subSku provided, will copy from product');
             
-            // Try to find a product (can use productId if provided, or just get first product)
             if (listingData.productId) {
               product = await prisma.product.findUnique({
                 where: { id: parseInt(listingData.productId) },
@@ -388,11 +436,10 @@ class ListingController {
             }
             
             if (!product) {
-              // No product specified - need at least one product to copy subSku from
               results.errors.push({
                 title: listingData.title,
-                sku: listingData.sku || listingData.groupSku,
-                error: `SubSku not provided and no product specified. Provide either subSku or productId.`
+                sku: listingData.sku,
+                error: `SubSku not provided and no product found. Provide either subSku or productId.`
               });
               continue;
             }
@@ -405,6 +452,9 @@ class ListingController {
             productSubSku: product.subSku,
             brandName: product.brand.name
           });
+
+          // Define productSubSkus for later use (case-sensitive array from product)
+          const productSubSkus = product.subSku ? product.subSku.split(',').map(sku => sku.trim()).filter(sku => sku) : [];
 
           // STEP 2: Get brand from listing data (NOT from product)
           // Listing has its own brand, we only validate product exists
@@ -528,7 +578,7 @@ class ListingController {
             productId: product.id,  // Link to product (for validation only)
             brandId: brand.id,
             title: listingData.title,
-            sku: listingData.sku || listingData.groupSku, // Support both sku and groupSku for backward compatibility
+            sku: listingData.sku, // sku field required (case-insensitive: sku, SKU, sKU all work)
             subSku: listingData.subSku,
             category: listingData.category,
             collectionName: listingData.collectionName || '',
@@ -549,7 +599,36 @@ class ListingController {
             attributes: finalAttributes
           });
 
-          results.created.push(listing);
+          // STEP 7: Auto-create inventory items from listing's subSku
+          let inventoryItems = [];
+          try {
+            const subSkus = listingData.subSku.split(',').map(s => s.trim()).filter(s => s);
+            
+            for (const subSku of subSkus) {
+              const item = await prisma.inventory.create({
+                data: {
+                  listingId: listing.id,
+                  brandId: brand.id,
+                  subSku: subSku,
+                  quantity: 0,  // Default: 0
+                  eta: null     // Default: null
+                }
+              });
+              inventoryItems.push(item);
+            }
+            
+            console.log(`✅ Created ${inventoryItems.length} inventory items for listing ${listing.id}`);
+          } catch (error) {
+            console.error('Failed to create inventory items:', error);
+          }
+
+          // Add inventory data to listing response
+          const listingWithInventory = {
+            ...listing,
+            inventory: inventoryItems
+          };
+
+          results.created.push(listingWithInventory);
 
           // Log management action
           await ManagementLogger.logListingAction(

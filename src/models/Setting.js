@@ -10,8 +10,7 @@ class SettingModel {
       setting = await prisma.setting.create({
         data: {
           inventoryConfig: {
-            minValue: 3,
-            maxValue: null // null means greater than 3 (unlimited)
+            minValue: 3
           }
         }
       });
@@ -35,8 +34,7 @@ class SettingModel {
     return await prisma.setting.create({
       data: {
         inventoryConfig: {
-          minValue: 3,
-          maxValue: null // null means greater than 3 (unlimited)
+          minValue: 3
         }
       }
     });

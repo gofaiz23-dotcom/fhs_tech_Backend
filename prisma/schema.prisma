@@ -64,6 +64,7 @@ model Brand {
   products Product[]
   listingActions ListingManagementHistory[] @relation("BrandListingActions")
   listings Listing[]
+  inventory Inventory[]
 
   @@map("brands")
   @@index([name])
@@ -393,7 +394,7 @@ model Listing {
   productId   Int      @map("product_id")  // Reference to Product - For validation only
   brandId     Int      @map("brand_id")
   title       String
-  sku         String   // Not unique - multiple listings can have same SKU
+  sku         String   @map("group_sku")  // Required - cannot be null
   subSku      String?  @map("sub_sku")  // Must exist in product's subSku field
   category    String
   collectionName String @default("") @map("collection_name")
@@ -429,6 +430,7 @@ model Listing {
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
   listingHistory ListingManagementHistory[]
+  inventory   Inventory[]
 
   @@map("listings")
   @@index([productId])
@@ -468,12 +470,35 @@ model ListingManagementHistory {
 // 12. Settings Table
 model Setting {
   id              Int      @id @default(autoincrement())
-  inventoryConfig Json     @default("{\"minValue\": 3, \"maxValue\": null}") @map("inventory_config") // JSONB: {minValue: 3, maxValue: null}
+  inventoryConfig Json     @default("{\"minValue\": 3}") @map("inventory_config") // JSONB: {minValue: 3}
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
   @@index([createdAt])
+}
+
+// 13. Inventory Table
+model Inventory {
+  id        Int      @id @default(autoincrement())
+  listingId Int      @map("listing_id")  // Reference to Listing
+  brandId   Int      @map("brand_id")    // Brand for access control
+  subSku    String   @map("sub_sku")     // One subSku per row (not comma-separated)
+  quantity  Int      @default(0)         // Quantity for this subSku
+  eta       String?                      // Estimated Time of Arrival
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  brand   Brand   @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@map("inventory")
+  @@index([listingId])
+  @@index([brandId])
+  @@index([subSku])
+  @@index([createdAt])
+  @@index([brandId, subSku])
 }
 
 

@@ -47,8 +47,7 @@ class SettingController {
         return res.status(400).json({
           error: 'inventoryConfig must be an object',
           expected: {
-            minValue: 'number',
-            maxValue: 'number or null (for unlimited/greater than minValue)'
+            minValue: 'number'
           }
         });
       }
@@ -56,22 +55,6 @@ class SettingController {
       if (typeof inventoryConfig.minValue !== 'number') {
         return res.status(400).json({
           error: 'minValue must be a number'
-        });
-      }
-
-      if (inventoryConfig.maxValue !== null && typeof inventoryConfig.maxValue !== 'number') {
-        return res.status(400).json({
-          error: 'maxValue must be a number or null (null = greater than minValue)'
-        });
-      }
-
-      if (inventoryConfig.maxValue !== null && inventoryConfig.maxValue <= inventoryConfig.minValue) {
-        return res.status(400).json({
-          error: 'maxValue must be greater than minValue',
-          provided: {
-            minValue: inventoryConfig.minValue,
-            maxValue: inventoryConfig.maxValue
-          }
         });
       }
 

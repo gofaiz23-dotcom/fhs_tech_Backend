@@ -35,7 +35,7 @@ class ListingModel {
     // Get total count for pagination
     const totalCount = await prisma.listing.count({ where: whereClause });
     
-    // Get paginated listings
+    // Get paginated listings with inventory
     const listings = await prisma.listing.findMany({
       where: whereClause,
       include: {
@@ -44,6 +44,16 @@ class ListingModel {
             id: true,
             name: true,
             description: true
+          }
+        },
+        inventory: {
+          select: {
+            id: true,
+            subSku: true,
+            quantity: true,
+            eta: true,
+            createdAt: true,
+            updatedAt: true
           }
         }
       },
@@ -98,7 +108,7 @@ class ListingModel {
     if (filters.search) {
       whereClause.OR = [
         { title: { contains: filters.search, mode: 'insensitive' } },
-        { groupSku: { contains: filters.search, mode: 'insensitive' } },
+        { sku: { contains: filters.search, mode: 'insensitive' } },
         { subSku: { contains: filters.search, mode: 'insensitive' } }
       ];
     }
@@ -122,10 +132,10 @@ class ListingModel {
     });
   }
 
-  // Find listing by Group SKU
-  static async findByGroupSku(groupSku) {
-    return await prisma.listing.findUnique({
-      where: { groupSku: groupSku },
+  // Find listing by SKU
+  static async findBySku(sku) {
+    return await prisma.listing.findFirst({
+      where: { sku: sku },
       include: {
         brand: {
           select: {
@@ -264,10 +274,10 @@ class ListingModel {
     }
   }
 
-  // Check if Group SKU already exists
-  static async checkGroupSkuExists(groupSku) {
-    return await prisma.listing.findUnique({
-      where: { groupSku: groupSku }
+  // Check if SKU already exists
+  static async checkSkuExists(sku) {
+    return await prisma.listing.findFirst({
+      where: { sku: sku }
     });
   }
 
