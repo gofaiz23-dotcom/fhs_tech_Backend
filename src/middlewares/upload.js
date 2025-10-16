@@ -11,6 +11,7 @@ const __dirname = path.dirname(__filename);
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, '../../uploads');
 const imagesDir = path.join(__dirname, '../../uploads/images');
+const excelsheetsDir = path.join(__dirname, '../../uploads/excelsheets');
 
 // Create uploads directories
 if (!fs.existsSync(uploadsDir)) {
@@ -23,10 +24,15 @@ if (!fs.existsSync(imagesDir)) {
   console.log('📁 Created images directory:', imagesDir);
 }
 
+if (!fs.existsSync(excelsheetsDir)) {
+  fs.mkdirSync(excelsheetsDir, { recursive: true });
+  console.log('📁 Created excelsheets directory:', excelsheetsDir);
+}
+
 // Configure multer for disk storage (CSV/Excel files)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadsDir);
+    cb(null, excelsheetsDir); // Store Excel/CSV files in excelsheets folder
   },
   filename: (req, file, cb) => {
     // Generate unique filename with timestamp
@@ -149,7 +155,7 @@ const generateUniqueFileFilename = (fieldname, originalname) => {
 // Configure multer for disk storage with memory buffer (hybrid approach)
 const hybridStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadsDir);
+    cb(null, excelsheetsDir); // Store Excel/CSV files in excelsheets folder
   },
   filename: (req, file, cb) => {
     const fileName = generateUniqueFileFilename(file.fieldname, file.originalname);
@@ -221,9 +227,9 @@ export const uploadFileAndImages = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
       if (file.fieldname === 'file') {
-        cb(null, uploadsDir);
+        cb(null, excelsheetsDir); // Store Excel/CSV in excelsheets folder
       } else if (file.fieldname === 'images' || file.fieldname === 'mainImage') {
-        cb(null, imagesDir);
+        cb(null, imagesDir); // Store images in images folder
       } else {
         cb(null, uploadsDir);
       }

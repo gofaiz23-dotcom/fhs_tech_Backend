@@ -28,9 +28,10 @@ app.use(cors({
   exposedHeaders: ['Set-Cookie']
 }));
 
-// Serve static files (images)
+// Serve static files (images and Excel files)
 app.use('/uploads/images', express.static('uploads/images'));
-app.use('/uploads/downloaded', express.static('uploads/downloaded'));
+app.use('/uploads/downloadedUrlimages', express.static('uploads/downloadedUrlimages'));
+app.use('/uploads/excelsheets', express.static('uploads/excelsheets'));
 
 // Rate limiting
 const limiter = rateLimit({

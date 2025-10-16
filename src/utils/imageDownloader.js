@@ -16,7 +16,7 @@ const __dirname = dirname(__filename);
 async function downloadImage(imageUrl) {
   try {
     // Create downloads directory if it doesn't exist
-    const downloadDir = path.join(__dirname, '../../uploads/downloaded');
+    const downloadDir = path.join(__dirname, '../../uploads/downloadedUrlimages');
     if (!fs.existsSync(downloadDir)) {
       fs.mkdirSync(downloadDir, { recursive: true });
     }
@@ -46,7 +46,7 @@ async function downloadImage(imageUrl) {
 
     return new Promise((resolve, reject) => {
       writer.on('finish', () => {
-        const localPath = `/uploads/downloaded/${filename}`;
+        const localPath = `/uploads/downloadedUrlimages/${filename}`;
         console.log(`✅ Downloaded image: ${imageUrl} → ${localPath}`);
         resolve(localPath);
       });

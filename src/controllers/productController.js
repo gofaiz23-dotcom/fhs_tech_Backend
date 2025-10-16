@@ -119,8 +119,9 @@ class ProductController {
             // Remove base64
             cleanedProduct.mainImageUrl = null;
           } else if (cleanedProduct.mainImageUrl.startsWith('/uploads/')) {
-            // Prepend base URL to local path
-            cleanedProduct.mainImageUrl = `${IMAGE_BASE_URL}${cleanedProduct.mainImageUrl}`;
+            // Update old path and prepend base URL
+            let imagePath = cleanedProduct.mainImageUrl.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+            cleanedProduct.mainImageUrl = `${IMAGE_BASE_URL}${imagePath}`;
           }
           // External URLs remain unchanged
         }
@@ -132,7 +133,9 @@ class ProductController {
             .map(img => {
               // Prepend base URL to local paths
               if (img.startsWith('/uploads/')) {
-                return `${IMAGE_BASE_URL}${img}`;
+                // Update old path
+                let imagePath = img.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                return `${IMAGE_BASE_URL}${imagePath}`;
               }
               return img; // External URLs remain unchanged
             });

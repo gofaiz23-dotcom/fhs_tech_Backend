@@ -199,8 +199,9 @@ class ListingController {
             // Remove base64
             cleanedListing.mainImageUrl = null;
           } else if (cleanedListing.mainImageUrl.startsWith('/uploads/')) {
-            // Prepend base URL to local path
-            cleanedListing.mainImageUrl = `${IMAGE_BASE_URL}${cleanedListing.mainImageUrl}`;
+            // Update old path and prepend base URL
+            let imagePath = cleanedListing.mainImageUrl.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+            cleanedListing.mainImageUrl = `${IMAGE_BASE_URL}${imagePath}`;
           }
           // External URLs remain unchanged
         }
@@ -212,7 +213,9 @@ class ListingController {
             .map(img => {
               // Prepend base URL to local paths
               if (img.startsWith('/uploads/')) {
-                return `${IMAGE_BASE_URL}${img}`;
+                // Update old path
+                let imagePath = img.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                return `${IMAGE_BASE_URL}${imagePath}`;
               }
               return img; // External URLs remain unchanged
             });
