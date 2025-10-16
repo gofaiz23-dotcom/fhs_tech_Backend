@@ -93,10 +93,10 @@ class ListingController {
       const duplicateGroups = {};
       
       result.listings.forEach(listing => {
-        const key = `${listing.groupSku}|${listing.subSku || ''}`;
+        const key = `${listing.sku}|${listing.subSku || ''}`;
         if (!duplicateGroups[key]) {
           duplicateGroups[key] = {
-            groupSku: listing.groupSku,
+            sku: listing.sku,
             subSku: listing.subSku || '',
             count: 0,
             listings: []
@@ -114,7 +114,7 @@ class ListingController {
       const duplicates = Object.values(duplicateGroups)
         .filter(group => group.count > 1)
         .map(group => ({
-          groupSku: group.groupSku,
+          sku: group.sku,
           subSku: group.subSku,
           listings: group.listings
         }));
@@ -223,6 +223,7 @@ class ListingController {
             ecommercePrice: ListingController.getFieldValue(listing, 'ecommercePrice'),
             mainImageUrl: ListingController.getFieldValue(listing, 'mainImageUrl'),
             galleryImages: ListingController.getFieldValue(listing, 'galleryImages'),
+            productCounts: ListingController.getFieldValue(listing, 'productCounts'),
             attributes: ListingController.getFieldValue(listing, 'attributes') || {}
           }));
         } else if (title && groupSku) {
@@ -249,6 +250,7 @@ class ListingController {
             ecommercePrice: ListingController.getFieldValue(req.body, 'ecommercePrice'),
             mainImageUrl: ListingController.getFieldValue(req.body, 'mainImageUrl'),
             galleryImages: ListingController.getFieldValue(req.body, 'galleryImages'),
+            productCounts: ListingController.getFieldValue(req.body, 'productCounts'),
             attributes: attributes || {}
           }];
         } else {
@@ -272,52 +274,130 @@ class ListingController {
       for (const listingData of listingsToCreate) {
         try {
           // STEP 0: Track duplicates (but don't skip them - create all)
-          const duplicateKey = `${listingData.groupSku}|${listingData.subSku || ''}`;
+          const duplicateKey = `${listingData.sku || listingData.groupSku}|${listingData.subSku || ''}`;
           if (processedListings.has(duplicateKey)) {
             const count = processedListings.get(duplicateKey);
             processedListings.set(duplicateKey, count + 1);
             // Log duplicate but still create it
             results.duplicates.push({
               title: listingData.title,
-              groupSku: listingData.groupSku,
+              sku: listingData.sku || listingData.groupSku,
               subSku: listingData.subSku,
-              note: `Duplicate: Same groupSku "${listingData.groupSku}" and subSku "${listingData.subSku || ''}"`
+              note: `Duplicate: Same sku "${listingData.sku || listingData.groupSku}" and subSku "${listingData.subSku || ''}"`
             });
             // Don't skip - continue to create the listing
           } else {
             processedListings.set(duplicateKey, 1);
           }
           
-          // STEP 1: Check if product exists (MANDATORY)
-          // For Excel uploads: Use groupSku to find the product (users don't know productId)
-          // For JSON: Can use productId, productGroupSku, or groupSku
+          // STEP 1: Find product by subSku (if provided) or search all products
           let product = null;
-          let searchKey = null;
+          let shouldValidateSubSku = false;
           
-          if (listingData.productId) {
-            // Method 1: Direct product ID (JSON only)
-            searchKey = listingData.productId;
-            product = await ListingModel.checkProductExists(listingData.productId);
-          } else if (listingData.productGroupSku) {
-            // Method 2: Product's groupSku field (JSON or Excel)
-            searchKey = listingData.productGroupSku;
-            product = await ListingModel.checkProductExists(listingData.productGroupSku);
-          } else if (listingData.groupSku) {
-            // Method 3: Use listing's groupSku to find product (Excel uploads)
-            searchKey = listingData.groupSku;
-            product = await ListingModel.checkProductExists(listingData.groupSku);
-          }
+          if (listingData.subSku && listingData.subSku.trim() !== '') {
+            // SubSku provided - find product that contains this subSku (case-insensitive)
+            shouldValidateSubSku = true;
+            const listingSubSkus = listingData.subSku.split(',').map(s => s.trim()).filter(s => s);
+            
+            console.log('🔍 Searching for product with subSkus (case-insensitive):', listingSubSkus);
+            
+            // Find any product that contains at least one of the listing's subSkus (case-insensitive)
+            const allProducts = await prisma.product.findMany({
+              include: {
+                brand: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
+              }
+            });
+            
+            for (const prod of allProducts) {
+              if (prod.subSku) {
+                const productSubSkus = prod.subSku.split(',').map(s => s.trim()).filter(s => s);
+                // Check if any listing subSku exists in product (case-insensitive)
+                const found = listingSubSkus.some(lsku => 
+                  productSubSkus.some(psku => psku.toLowerCase() === lsku.toLowerCase())
+                );
+                if (found) {
+                  product = prod;
+                  break;
+                }
+              }
+            }
+            
+            if (!product) {
+              results.errors.push({
+                title: listingData.title,
+                sku: listingData.sku || listingData.groupSku,
+                subSku: listingData.subSku,
+                error: `Product not found with subSku: "${listingData.subSku}". Listing subSku must exist in product's subSku field!`
+              });
+              continue;
+            }
+            
+            // Validate ALL listing subSkus exist in product
+          const productSubSkus = product.subSku ? product.subSku.split(',').map(sku => sku.trim()).filter(sku => sku) : [];
           
-          if (!product) {
+          console.log('🔍 Validating SubSKUs (case-insensitive):', {
+            listingSubSkus: listingSubSkus,
+            productSubSkus: productSubSkus
+          });
+          
+          // Check if ALL listing subSkus exist in product's subSku list (case-insensitive)
+          const invalidSubSkus = listingSubSkus.filter(lsku => 
+            !productSubSkus.some(psku => psku.toLowerCase() === lsku.toLowerCase())
+          );
+          
+          if (invalidSubSkus.length > 0) {
+            console.log('❌ SubSKU Validation Failed:', {
+              listingSubSkus: listingSubSkus,
+              productSubSkus: productSubSkus,
+              invalidSubSkus: invalidSubSkus
+            });
+            
             results.errors.push({
               title: listingData.title,
-              groupSku: listingData.groupSku,
-              error: `Product not found with SKU: ${searchKey}. Listing can only be created if product exists in products table!`
+              sku: listingData.sku || listingData.groupSku,
+              subSku: listingData.subSku,
+              error: `SubSKU validation failed: "${invalidSubSkus.join(', ')}" not found in product. Product has: ${product.subSku || 'none'}. All listing subSkus must exist in product's subSku field!`
             });
             continue;
           }
+          
+          console.log('✅ SubSKU Validation Passed: All subSkus exist in product (case-insensitive)');
+          } else {
+            // No subSku provided - we'll copy from product later
+            // For now, just find any product to link to (can be first product)
+            console.log('ℹ️ No subSku provided, will copy from product');
+            
+            // Try to find a product (can use productId if provided, or just get first product)
+            if (listingData.productId) {
+              product = await prisma.product.findUnique({
+                where: { id: parseInt(listingData.productId) },
+                include: {
+                  brand: {
+                    select: {
+                      id: true,
+                      name: true
+                    }
+                  }
+                }
+              });
+            }
+            
+            if (!product) {
+              // No product specified - need at least one product to copy subSku from
+              results.errors.push({
+                title: listingData.title,
+                sku: listingData.sku || listingData.groupSku,
+                error: `SubSku not provided and no product specified. Provide either subSku or productId.`
+              });
+              continue;
+            }
+          }
 
-          // STEP 1.5: Validate BOTH groupSku and subSku exist in product
           console.log('✅ Product Found:', {
             productId: product.id,
             productTitle: product.title,
@@ -325,50 +405,6 @@ class ListingController {
             productSubSku: product.subSku,
             brandName: product.brand.name
           });
-
-          // Validate groupSku matches
-          if (product.groupSku !== listingData.groupSku) {
-            results.errors.push({
-              title: listingData.title,
-              groupSku: listingData.groupSku,
-              error: `GroupSKU mismatch: Listing groupSku "${listingData.groupSku}" does not match product groupSku "${product.groupSku}"`
-            });
-            continue;
-          }
-
-          // Validate subSku if provided
-          if (listingData.subSku && listingData.subSku.trim() !== '') {
-            const listingSubSkus = listingData.subSku.split(',').map(sku => sku.trim()).filter(sku => sku);
-            const productSubSkus = product.subSku ? product.subSku.split(',').map(sku => sku.trim()).filter(sku => sku) : [];
-            
-            console.log('🔍 Validating SubSKUs:', {
-              listingSubSkus: listingSubSkus,
-              productSubSkus: productSubSkus
-            });
-            
-            // Check if ALL listing subSkus exist in product's subSku list
-            const invalidSubSkus = listingSubSkus.filter(sku => !productSubSkus.includes(sku));
-            
-            if (invalidSubSkus.length > 0) {
-              console.log('❌ SubSKU Validation Failed:', {
-                listingSubSkus: listingSubSkus,
-                productSubSkus: productSubSkus,
-                invalidSubSkus: invalidSubSkus
-              });
-              
-              results.errors.push({
-                title: listingData.title,
-                groupSku: listingData.groupSku,
-                error: `SubSKU validation failed: "${invalidSubSkus.join(', ')}" not found in product. Product has: ${product.subSku || 'none'}. All listing subSkus must exist in product's subSku list!`
-              });
-              continue;
-            }
-            
-            console.log('✅ SubSKU Validation Passed: All subSkus exist in product');
-          } else {
-            // If no subSku provided in listing, use product's groupSku as default
-            console.log('ℹ️ No subSku provided, will use product groupSku as default');
-          }
 
           // STEP 2: Get brand from listing data (NOT from product)
           // Listing has its own brand, we only validate product exists
@@ -414,9 +450,32 @@ class ListingController {
             }
           }
 
-          // STEP 4: If subSku is empty, use groupSku as default
+          // STEP 4: If subSku not provided, copy from product
           if (!listingData.subSku || listingData.subSku.trim() === '') {
-            listingData.subSku = listingData.groupSku;
+            listingData.subSku = product.subSku;
+            console.log(`ℹ️ Copied subSku from product: ${listingData.subSku}`);
+          }
+
+          // STEP 4.5: Auto-generate productCounts if not provided
+          if (!listingData.productCounts && listingData.subSku) {
+            const subSkuArray = listingData.subSku.split(',').map(s => s.trim()).filter(s => s);
+            const counts = {};
+            
+            // Count occurrences of each subSku (case-insensitive counting)
+            subSkuArray.forEach(sku => {
+              // Normalize to original case from product for consistency
+              const matchingProductSku = productSubSkus.find(psku => psku.toLowerCase() === sku.toLowerCase());
+              const normalizedSku = matchingProductSku || sku; // Use product's case if found
+              
+              if (counts[normalizedSku]) {
+                counts[normalizedSku] += 1;
+              } else {
+                counts[normalizedSku] = 1;
+              }
+            });
+            
+            listingData.productCounts = counts;
+            console.log('✅ Auto-generated productCounts from subSku (case-insensitive):', counts);
           }
 
           // STEP 5: Validate and convert price values
@@ -469,7 +528,7 @@ class ListingController {
             productId: product.id,  // Link to product (for validation only)
             brandId: brand.id,
             title: listingData.title,
-            groupSku: listingData.groupSku,
+            sku: listingData.sku || listingData.groupSku, // Support both sku and groupSku for backward compatibility
             subSku: listingData.subSku,
             category: listingData.category,
             collectionName: listingData.collectionName || '',
@@ -486,6 +545,7 @@ class ListingController {
             ecommercePrice: listingData.ecommercePrice || 0,
             mainImageUrl: listingData.mainImageUrl || null,
             galleryImages: listingData.galleryImages || null,
+            productCounts: listingData.productCounts || null,  // JSONB mapping subSku to quantity
             attributes: finalAttributes
           });
 
@@ -553,7 +613,7 @@ class ListingController {
   static async updateListing(req, res) {
     try {
       const listingId = parseInt(req.params.id);
-      const { title, groupSku, subSku, category, collectionName, shipTypes, singleSetItem, attributes } = req.body;
+      const { title, sku, groupSku, subSku, category, collectionName, shipTypes, singleSetItem, productCounts, attributes } = req.body;
 
       // Check if listing exists
       const existingListing = await ListingModel.findById(listingId);
@@ -583,12 +643,13 @@ class ListingController {
 
       const updatedListing = await ListingModel.update(listingId, {
         title,
-        groupSku,
+        sku: sku || groupSku,
         subSku,
         category,
         collectionName,
         shipTypes,
         singleSetItem,
+        productCounts,
         attributes
       });
 

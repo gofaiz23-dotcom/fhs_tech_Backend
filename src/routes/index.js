@@ -7,6 +7,7 @@ import shippingRoutes from './shippingRoutes.js';
 import productRoutes from './productRoutes.js';
 import productPricingRoutes from './productPricingRoutes.js';
 import listingRoutes from './listingRoutes.js';
+import settingRoutes from './settingRoutes.js';
 import permissionRoutes from './permissionRoutes.js';
 import managementHistoryRoutes from './managementHistoryRoutes.js';
 import userActivityRoutes from './userActivityRoutes.js';
@@ -23,6 +24,7 @@ router.use('/shipping', shippingRoutes);
 router.use('/products', productRoutes);
 router.use('/products/pricing', productPricingRoutes);
 router.use('/listings', listingRoutes);
+router.use('/settings', settingRoutes);
 router.use('/users', permissionRoutes);
 router.use('/management', managementHistoryRoutes);
 router.use('/activities', userActivityRoutes);
@@ -88,6 +90,7 @@ router.get('/', (req, res) => {
       shipping: '/api/shipping',
       products: '/api/products',
       listings: '/api/listings',
+      settings: '/api/settings',
       permissions: '/api/users',
       management: '/api/management',
       activities: '/api/activities',

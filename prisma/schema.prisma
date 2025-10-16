@@ -387,14 +387,14 @@ model Product {
   @@index([brandId, ecommercePrice])
 }
 
-// 11. Listings Table (Product validation only - groupSku and subSku must exist in products)
+// 11. Listings Table (Only subSku must exist in product's subSku field)
 model Listing {
   id          Int      @id @default(autoincrement())
   productId   Int      @map("product_id")  // Reference to Product - For validation only
   brandId     Int      @map("brand_id")
   title       String
-  groupSku    String   @map("group_sku")  // Not unique - multiple listings can have same SKU
-  subSku      String?  @map("sub_sku")  // Nullable, supports comma-separated values like "123ed,345Df,678gh"
+  sku         String   // Not unique - multiple listings can have same SKU
+  subSku      String?  @map("sub_sku")  // Must exist in product's subSku field
   category    String
   collectionName String @default("") @map("collection_name")
   shipTypes   String   @map("ship_types")
@@ -417,6 +417,9 @@ model Listing {
   // Image Columns (Optional)
   mainImageUrl        String? @map("main_image_url") // Main listing image URL
   galleryImages       Json?   @map("gallery_images") // Array of gallery image URLs
+  
+  // Product Counts (JSONB - maps each subSku value to its quantity)
+  productCounts       Json?   @map("product_counts") // Example: {"subsku-1": 10, "subsku-2": 5}
   
   attributes  Json     // All extra data in JSONB format
   createdAt   DateTime @default(now()) @map("created_at")
@@ -461,3 +464,16 @@ model ListingManagementHistory {
   @@index([action])
   @@index([createdAt])
 }
+
+// 12. Settings Table
+model Setting {
+  id              Int      @id @default(autoincrement())
+  inventoryConfig Json     @default("{\"minValue\": 3, \"maxValue\": null}") @map("inventory_config") // JSONB: {minValue: 3, maxValue: null}
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+  @@index([createdAt])
+}
+
+
