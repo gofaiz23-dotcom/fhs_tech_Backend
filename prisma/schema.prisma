@@ -349,7 +349,6 @@ model Product {
   subSku      String?  @map("sub_sku")  // Nullable, supports comma-separated values like "123ed,345Df,678gh"
   category    String
   collectionName String @default("") @map("collection_name")
-  shipTypes   String   @map("ship_types")
   singleSetItem String @map("single_set_item")
   
   

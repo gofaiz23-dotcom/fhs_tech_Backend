@@ -189,7 +189,7 @@ class ProductController {
         productsToCreate = validData;
       } else {
         // Handle JSON data (single or multiple products)
-        const { products, brandId, brandName, title, groupSku, subSku, category, collectionName, shipTypes, singleSetItem, attributes } = req.body;
+        const { products, brandId, brandName, title, groupSku, subSku, category, collectionName, singleSetItem, attributes } = req.body;
 
         if (products && Array.isArray(products)) {
           // Multiple products with case-insensitive field extraction
@@ -201,7 +201,6 @@ class ProductController {
             subSku: ProductController.getFieldValue(product, 'subSku')?.trim(),
             category: ProductController.getFieldValue(product, 'category')?.trim(),
             collectionName: ProductController.getFieldValue(product, 'collectionName')?.trim(),
-            shipTypes: ProductController.getFieldValue(product, 'shipTypes')?.trim(),
             singleSetItem: ProductController.getFieldValue(product, 'singleSetItem')?.trim(),
             brandRealPrice: ProductController.getFieldValue(product, 'brandRealPrice'),
             brandMiscellaneous: ProductController.getFieldValue(product, 'brandMiscellaneous'),
@@ -247,7 +246,6 @@ class ProductController {
             subSku: subSku?.trim() || '',
             category: category?.trim() || '',
             collectionName: collectionName?.trim() || '',
-            shipTypes: shipTypes?.trim() || '',
             singleSetItem: singleSetItem?.trim() || '',
             brandRealPrice: brandRealPrice,
             brandMiscellaneous: brandMiscellaneous,
@@ -426,7 +424,6 @@ class ProductController {
             subSku: productData.subSku,
             category: productData.category,
             collectionName: productData.collectionName,
-            shipTypes: productData.shipTypes,
             singleSetItem: productData.singleSetItem,
             // Brand Pricing (using validated and converted values)
             brandRealPrice: brandRealPrice,
@@ -511,7 +508,7 @@ class ProductController {
   static async updateProduct(req, res) {
     try {
       const productId = parseInt(req.params.id);
-      const { title, groupSku, subSku, category, collectionName, shipTypes, singleSetItem, attributes } = req.body;
+      const { title, groupSku, subSku, category, collectionName, singleSetItem, attributes } = req.body;
 
       // Check if product exists
       const existingProduct = await ProductModel.findById(productId);
@@ -545,7 +542,6 @@ class ProductController {
         subSku,
         category,
         collectionName,
-        shipTypes,
         singleSetItem,
         attributes
       });
@@ -1088,7 +1084,6 @@ class ProductController {
           subSku: product.subSku || '',
           category: product.category || '',
           collections: product.collections || '',
-          shipTypes: product.shipTypes || '',
           singleSetItem: product.singleSetItem || '',
           brandRealPrice: parseFloat(product.brandRealPrice),
           brandMiscellaneous: parseFloat(product.brandMiscellaneous),
@@ -1158,7 +1153,6 @@ class ProductController {
           { key: 'subSku', header: 'Sub SKU', width: 20 },
           { key: 'category', header: 'Category', width: 15 },
           { key: 'collections', header: 'Collections', width: 15 },
-          { key: 'shipTypes', header: 'Ship Types', width: 15 },
           { key: 'singleSetItem', header: 'Single Set Item', width: 15 },
           { key: 'brandRealPrice', header: 'Brand Real Price', width: 15 },
           { key: 'brandMiscellaneous', header: 'Brand Miscellaneous', width: 20 },
