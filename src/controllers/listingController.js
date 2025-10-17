@@ -966,6 +966,424 @@ class ListingController {
       });
     }
   }
+
+  // Get simple image template - sku, subSku, mainImageUrl, galleryImages (listings without images first)
+  static async getImageTemplate(req, res) {
+    try {
+      // Build where clause based on user access
+      let whereClause = {};
+      
+      // For non-admin users, filter by accessible brands
+      if (req.user.role !== 'ADMIN') {
+        const userBrands = await prisma.userBrandAccess.findMany({
+          where: {
+            userId: req.user.userId,
+            isActive: true
+          }
+        });
+        
+        const accessibleBrandIds = userBrands.map(access => access.brandId);
+        
+        if (accessibleBrandIds.length === 0) {
+          return res.status(403).json({
+            error: 'No brand access',
+            message: 'You don\'t have access to any brands'
+          });
+        }
+        
+        whereClause.brandId = { in: accessibleBrandIds };
+      }
+      
+      // Get all listings with image fields
+      const listings = await prisma.listing.findMany({
+        where: whereClause,
+        select: {
+          sku: true,
+          subSku: true,
+          mainImageUrl: true,
+          galleryImages: true
+        },
+        orderBy: {
+          sku: 'asc'
+        }
+      });
+      
+      // Get base URL from environment
+      const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'http://192.168.0.23:5000';
+      
+      // Helper function to prepend base URL to local paths
+      const prependBaseUrl = (imagePath) => {
+        if (!imagePath || imagePath.trim() === '') return '';
+        
+        // If already a full URL (starts with http:// or https://), return as is
+        if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+          return imagePath;
+        }
+        
+        // If local path (starts with /uploads/), prepend base URL
+        if (imagePath.startsWith('/uploads/')) {
+          // Fix old path naming
+          let fixedPath = imagePath.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+          return `${IMAGE_BASE_URL}${fixedPath}`;
+        }
+        
+        // Otherwise return as is
+        return imagePath;
+      };
+      
+      // Separate listings with and without images
+      const listingsWithoutImages = [];
+      const listingsWithImages = [];
+      
+      listings.forEach(listing => {
+        const hasMainImage = listing.mainImageUrl && listing.mainImageUrl.trim() !== '';
+        const hasGalleryImages = listing.galleryImages && Array.isArray(listing.galleryImages) && listing.galleryImages.length > 0;
+        const hasImages = hasMainImage || hasGalleryImages;
+        
+        // Process main image URL
+        const mainImageWithBaseUrl = prependBaseUrl(listing.mainImageUrl);
+        
+        // Process gallery images and format as comma-separated string for Excel
+        let galleryImagesStr = '';
+        if (listing.galleryImages && Array.isArray(listing.galleryImages)) {
+          const galleryWithBaseUrls = listing.galleryImages.map(img => prependBaseUrl(img));
+          galleryImagesStr = galleryWithBaseUrls.join(',');
+        }
+        
+        const listingData = {
+          sku: listing.sku,
+          subSku: listing.subSku || '',
+          mainImageUrl: mainImageWithBaseUrl,
+          galleryImages: galleryImagesStr
+        };
+        
+        if (hasImages) {
+          listingsWithImages.push(listingData);
+        } else {
+          listingsWithoutImages.push(listingData);
+        }
+      });
+      
+      // Combine data: listings WITHOUT images first, then listings WITH images
+      const templateData = [...listingsWithoutImages, ...listingsWithImages];
+      
+      res.json({
+        message: 'Listing image template data retrieved successfully - Listings without images shown first',
+        timestamp: new Date().toISOString(),
+        summary: {
+          totalListings: listings.length,
+          listingsWithoutImages: listingsWithoutImages.length,
+          listingsWithImages: listingsWithImages.length
+        },
+        columns: ['sku', 'subSku', 'mainImageUrl', 'galleryImages'],
+        imageBaseUrl: IMAGE_BASE_URL,
+        templateData: templateData
+      });
+      
+    } catch (error) {
+      console.error('Get listing image template error:', error);
+      res.status(500).json({
+        error: 'Failed to get listing image template',
+        details: error.message
+      });
+    }
+  }
+
+  // Bulk upload listing images - Excel/JSON with image URLs - Unlimited with background processing
+  static async bulkUploadListingImages(req, res) {
+    try {
+      console.log('📸 Bulk Listing Image Upload Started');
+      console.log('🔍 Request Content-Type:', req.get('Content-Type'));
+      
+      let imageData = [];
+      
+      // Check if Excel/CSV file was uploaded
+      if (req.file) {
+        console.log('📁 Excel File Upload Detected:', {
+          filename: req.file.originalname,
+          size: req.file.size,
+          mimetype: req.file.mimetype,
+          path: req.file.path
+        });
+
+        // Process Excel/CSV file from disk
+        const FileProcessor = (await import('../utils/fileProcessor.js')).default;
+        const fs = await import('fs');
+        
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const fileData = await FileProcessor.processFileBuffer(fileBuffer, req.file.originalname);
+        
+        console.log('📊 Excel Data Processed:', {
+          totalRows: fileData.length,
+          sampleRow: fileData[0] || null
+        });
+        
+        if (fileData.length === 0) {
+          return res.status(400).json({
+            error: 'Excel file is empty or contains no valid data'
+          });
+        }
+
+        // Transform Excel data to imageData format
+        // Expected columns: sku, mainImageUrl, galleryImages (comma-separated URLs)
+        imageData = fileData.map(row => {
+          const galleryImagesStr = ListingController.getFieldValue(row, 'galleryImages');
+          let galleryImagesArray = [];
+          
+          if (galleryImagesStr) {
+            // Handle comma-separated URLs
+            if (typeof galleryImagesStr === 'string') {
+              galleryImagesArray = galleryImagesStr.split(',').map(url => url.trim()).filter(url => url);
+            } else if (Array.isArray(galleryImagesStr)) {
+              galleryImagesArray = galleryImagesStr;
+            }
+          }
+          
+          return {
+            sku: ListingController.getFieldValue(row, 'sku'),
+            mainImageUrl: ListingController.getFieldValue(row, 'mainImageUrl'),
+            galleryImages: galleryImagesArray
+          };
+        }).filter(item => item.sku); // Only include rows with sku
+        
+        console.log('✅ Transformed to imageData:', {
+          totalRecords: imageData.length,
+          sample: imageData[0]
+        });
+        
+      } else if (req.body.imageData && Array.isArray(req.body.imageData)) {
+        // JSON bulk upload
+        imageData = req.body.imageData;
+      } else {
+        return res.status(400).json({
+          error: 'Invalid request format',
+          message: 'Provide either an Excel/CSV file or JSON imageData array',
+          examples: {
+            excelUpload: 'Upload Excel with columns: sku, mainImageUrl, galleryImages',
+            jsonUpload: '{ "imageData": [{ "sku": "SKU-001", "mainImageUrl": "url", "galleryImages": ["url1", "url2"] }] }'
+          }
+        });
+      }
+      
+      // Validate imageData
+      if (imageData.length === 0) {
+        return res.status(400).json({
+          error: 'No valid image data provided',
+          message: 'Excel must contain sku column with image URLs'
+        });
+      }
+
+      // For small datasets (< 100), process immediately
+      if (imageData.length < 100) {
+        console.log('📦 Small dataset detected, processing immediately...');
+        return ListingController.processImageDataSync(req, res, imageData);
+      }
+
+      // For large datasets, use background processing
+      console.log('🚀 Large dataset detected, using background processing...');
+      const queueService = (await import('../services/queueService.js')).default;
+      const jobResult = await queueService.addBulkImageJob({
+        imageData: imageData,
+        userId: req.user.userId,
+        type: 'listing'
+      }, req.user.userId);
+
+      res.status(202).json({
+        message: `Large image dataset detected (${imageData.length} listings). Processing in background.`,
+        jobId: jobResult.jobId,
+        status: jobResult.status,
+        totalListings: imageData.length,
+        estimatedTime: `${Math.ceil(imageData.length / 50)} minutes`,
+        note: 'Use GET /api/listings/status to check progress',
+        timestamp: new Date().toISOString(),
+        fileInfo: req.file ? {
+          originalName: req.file.originalname,
+          storedName: req.file.filename,
+          path: req.file.path,
+          size: req.file.size
+        } : null
+      });
+
+    } catch (error) {
+      console.error('❌ Bulk listing image upload error:', error);
+      res.status(500).json({
+        error: 'Failed to upload listing images',
+        details: error.message
+      });
+    }
+  }
+
+  // Process image data synchronously (for small datasets)
+  static async processImageDataSync(req, res, imageData) {
+    try {
+      let results = {
+        updated: [],
+        errors: [],
+        notFound: []
+      };
+
+      for (const item of imageData) {
+        try {
+          // Find listing by sku
+          const listing = await prisma.listing.findFirst({
+            where: { sku: item.sku }
+          });
+
+          if (!listing) {
+            results.notFound.push({
+              sku: item.sku,
+              error: 'Listing not found'
+            });
+            continue;
+          }
+
+          // Check user access (for non-admin users)
+          if (req.user.role !== 'ADMIN') {
+            const hasAccess = await prisma.userBrandAccess.findFirst({
+              where: {
+                userId: req.user.userId,
+                brandId: listing.brandId,
+                isActive: true
+              }
+            });
+
+            if (!hasAccess) {
+              results.errors.push({
+                sku: item.sku,
+                error: 'Access denied to this listing brand'
+              });
+              continue;
+            }
+          }
+
+          // Process images (download URLs if provided)
+          let finalMainImage = listing.mainImageUrl; // Keep existing if not provided
+          let finalGalleryImages = listing.galleryImages || [];
+
+          if (item.mainImageUrl) {
+            finalMainImage = await processImage(item.mainImageUrl);
+          }
+
+          if (item.galleryImages && Array.isArray(item.galleryImages) && item.galleryImages.length > 0) {
+            const downloadedGallery = await processImages(item.galleryImages);
+            finalGalleryImages = [...finalGalleryImages, ...downloadedGallery];
+          }
+
+          // Update listing with new images
+          const updatedListing = await prisma.listing.update({
+            where: { id: listing.id },
+            data: {
+              mainImageUrl: finalMainImage,
+              galleryImages: finalGalleryImages
+            }
+          });
+
+          results.updated.push({
+            sku: item.sku,
+            listingId: listing.id,
+            mainImageUrl: finalMainImage,
+            galleryImagesCount: finalGalleryImages.length
+          });
+
+          // Log management action
+          await ManagementLogger.logListingAction(
+            req.user.userId,
+            'UPDATE_IMAGES',
+            listing.id,
+            listing.brandId,
+            { 
+              sku: item.sku,
+              mainImageUrl: finalMainImage,
+              galleryImagesCount: finalGalleryImages.length
+            },
+            req
+          );
+
+        } catch (error) {
+          results.errors.push({
+            sku: item.sku,
+            error: error.message
+          });
+        }
+      }
+
+      // Get base URL for response
+      const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'http://192.168.0.23:5000';
+      
+      // Prepend base URL to local paths
+      const cleanResults = results.updated.map(item => ({
+        ...item,
+        mainImageUrl: item.mainImageUrl && item.mainImageUrl.startsWith('/uploads/') 
+          ? `${IMAGE_BASE_URL}${item.mainImageUrl}` 
+          : item.mainImageUrl
+      }));
+
+      res.json({
+        message: `Processed ${imageData.length} listing(s) for image upload`,
+        summary: {
+          total: imageData.length,
+          updated: results.updated.length,
+          notFound: results.notFound.length,
+          errors: results.errors.length
+        },
+        timestamp: new Date().toISOString(),
+        results: {
+          updated: cleanResults,
+          notFound: results.notFound,
+          errors: results.errors
+        }
+      });
+
+    } catch (error) {
+      console.error('Process listing image data sync error:', error);
+      res.status(500).json({
+        error: 'Failed to process listing image data',
+        details: error.message
+      });
+    }
+  }
+
+  // Get bulk processing status (for listings)
+  static async getBulkStatus(req, res) {
+    try {
+      const queueService = (await import('../services/queueService.js')).default;
+      const { jobId, queueName } = req.query;
+
+      // If specific job ID provided
+      if (jobId && queueName) {
+        const jobStatus = await queueService.getJobStatus(queueName, jobId);
+        return res.json({
+          message: 'Listing job status retrieved successfully',
+          jobStatus,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // Get user's jobs
+      const userJobs = await queueService.getUserJobs(req.user.userId);
+
+      // If admin, also get queue statistics
+      let queueStats = null;
+      if (req.user.role === 'ADMIN') {
+        queueStats = await queueService.getQueueStats();
+      }
+
+      res.json({
+        message: 'Listing bulk processing status retrieved successfully',
+        userRole: req.user.role,
+        userJobs: userJobs,
+        ...(queueStats && { queueStats }),
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Get listing bulk status error:', error);
+      res.status(500).json({
+        error: 'Failed to get listing bulk processing status',
+        details: error.message
+      });
+    }
+  }
 }
 
 export default ListingController;

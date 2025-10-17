@@ -775,7 +775,259 @@ class ProductController {
     }
   }
 
-  // Upload product images - supports both single and bulk uploads (JSON and Form Data) - Only for existing products
+  // Bulk upload product images - Excel/JSON with image URLs - Unlimited with background processing
+  static async bulkUploadProductImages(req, res) {
+    try {
+      console.log('📸 Bulk Image Upload Started');
+      console.log('🔍 Request Content-Type:', req.get('Content-Type'));
+      
+      let imageData = [];
+      
+      // Check if Excel/CSV file was uploaded
+      if (req.file) {
+        console.log('📁 Excel File Upload Detected:', {
+          filename: req.file.originalname,
+          size: req.file.size,
+          mimetype: req.file.mimetype,
+          path: req.file.path
+        });
+
+        // Process Excel/CSV file from disk
+        const FileProcessor = (await import('../utils/fileProcessor.js')).default;
+        const fs = await import('fs');
+        
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const fileData = await FileProcessor.processFileBuffer(fileBuffer, req.file.originalname);
+        
+        console.log('📊 Excel Data Processed:', {
+          totalRows: fileData.length,
+          sampleRow: fileData[0] || null
+        });
+        
+        if (fileData.length === 0) {
+          return res.status(400).json({
+            error: 'Excel file is empty or contains no valid data'
+          });
+        }
+
+        // Transform Excel data to imageData format
+        // Expected columns: groupSku, mainImageUrl, galleryImages (comma-separated URLs)
+        imageData = fileData.map(row => {
+          const galleryImagesStr = ProductController.getFieldValue(row, 'galleryImages');
+          let galleryImagesArray = [];
+          
+          if (galleryImagesStr) {
+            // Handle comma-separated URLs
+            if (typeof galleryImagesStr === 'string') {
+              galleryImagesArray = galleryImagesStr.split(',').map(url => url.trim()).filter(url => url);
+            } else if (Array.isArray(galleryImagesStr)) {
+              galleryImagesArray = galleryImagesStr;
+            }
+          }
+          
+          return {
+            groupSku: ProductController.getFieldValue(row, 'groupSku'),
+            mainImageUrl: ProductController.getFieldValue(row, 'mainImageUrl'),
+            galleryImages: galleryImagesArray
+          };
+        }).filter(item => item.groupSku); // Only include rows with groupSku
+        
+        console.log('✅ Transformed to imageData:', {
+          totalRecords: imageData.length,
+          sample: imageData[0]
+        });
+        
+      } else if (req.body.imageData && Array.isArray(req.body.imageData)) {
+        // JSON bulk upload
+        imageData = req.body.imageData;
+      } else {
+        return res.status(400).json({
+          error: 'Invalid request format',
+          message: 'Provide either an Excel/CSV file or JSON imageData array',
+          examples: {
+            excelUpload: 'Upload Excel with columns: groupSku, mainImageUrl, galleryImages',
+            jsonUpload: '{ "imageData": [{ "groupSku": "SKU-001", "mainImageUrl": "url", "galleryImages": ["url1", "url2"] }] }'
+          }
+        });
+      }
+      
+      // Validate imageData
+      if (imageData.length === 0) {
+        return res.status(400).json({
+          error: 'No valid image data provided',
+          message: 'Excel must contain groupSku column with image URLs'
+        });
+      }
+
+      // For small datasets (< 100), process immediately
+      if (imageData.length < 100) {
+        console.log('📦 Small dataset detected, processing immediately...');
+        return ProductController.processImageDataSync(req, res, imageData);
+      }
+
+      // For large datasets, use background processing
+      console.log('🚀 Large dataset detected, using background processing...');
+      const jobResult = await queueService.addBulkImageJob({
+        imageData: imageData,
+        userId: req.user.userId
+      }, req.user.userId);
+
+      res.status(202).json({
+        message: `Large image dataset detected (${imageData.length} products). Processing in background.`,
+        jobId: jobResult.jobId,
+        status: jobResult.status,
+        totalProducts: imageData.length,
+        estimatedTime: `${Math.ceil(imageData.length / 50)} minutes`,
+        note: 'Use GET /api/products/status to check progress',
+        timestamp: new Date().toISOString(),
+        fileInfo: req.file ? {
+          originalName: req.file.originalname,
+          storedName: req.file.filename,
+          path: req.file.path,
+          size: req.file.size
+        } : null
+      });
+
+    } catch (error) {
+      console.error('❌ Bulk image upload error:', error);
+      res.status(500).json({
+        error: 'Failed to upload product images',
+        details: error.message
+      });
+    }
+  }
+
+  // Process image data synchronously (for small datasets)
+  static async processImageDataSync(req, res, imageData) {
+    try {
+      let results = {
+        updated: [],
+        errors: [],
+        notFound: []
+      };
+
+      for (const item of imageData) {
+        try {
+          // Find product by groupSku
+          const product = await prisma.product.findFirst({
+            where: { groupSku: item.groupSku }
+          });
+
+          if (!product) {
+            results.notFound.push({
+              groupSku: item.groupSku,
+              error: 'Product not found'
+            });
+            continue;
+          }
+
+          // Check user access (for non-admin users)
+          if (req.user.role !== 'ADMIN') {
+            const hasAccess = await prisma.userBrandAccess.findFirst({
+              where: {
+                userId: req.user.userId,
+                brandId: product.brandId,
+                isActive: true
+              }
+            });
+
+            if (!hasAccess) {
+              results.errors.push({
+                groupSku: item.groupSku,
+                error: 'Access denied to this product brand'
+              });
+              continue;
+            }
+          }
+
+          // Process images (download URLs if provided)
+          let finalMainImage = product.mainImageUrl; // Keep existing if not provided
+          let finalGalleryImages = product.galleryImages || [];
+
+          if (item.mainImageUrl) {
+            finalMainImage = await processImage(item.mainImageUrl);
+          }
+
+          if (item.galleryImages && Array.isArray(item.galleryImages) && item.galleryImages.length > 0) {
+            const downloadedGallery = await processImages(item.galleryImages);
+            finalGalleryImages = [...finalGalleryImages, ...downloadedGallery];
+          }
+
+          // Update product with new images
+          const updatedProduct = await prisma.product.update({
+            where: { id: product.id },
+            data: {
+              mainImageUrl: finalMainImage,
+              galleryImages: finalGalleryImages
+            }
+          });
+
+          results.updated.push({
+            groupSku: item.groupSku,
+            productId: product.id,
+            mainImageUrl: finalMainImage,
+            galleryImagesCount: finalGalleryImages.length
+          });
+
+          // Log management action
+          await ManagementLogger.logProductAction(
+            req.user.userId,
+            'UPDATE_IMAGES',
+            product.id,
+            product.brandId,
+            { 
+              groupSku: item.groupSku,
+              mainImageUrl: finalMainImage,
+              galleryImagesCount: finalGalleryImages.length
+            },
+            req
+          );
+
+        } catch (error) {
+          results.errors.push({
+            groupSku: item.groupSku,
+            error: error.message
+          });
+        }
+      }
+
+      // Get base URL for response
+      const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'http://192.168.0.23:5000';
+      
+      // Prepend base URL to local paths
+      const cleanResults = results.updated.map(item => ({
+        ...item,
+        mainImageUrl: item.mainImageUrl && item.mainImageUrl.startsWith('/uploads/') 
+          ? `${IMAGE_BASE_URL}${item.mainImageUrl}` 
+          : item.mainImageUrl
+      }));
+
+      res.json({
+        message: `Processed ${imageData.length} product(s) for image upload`,
+        summary: {
+          total: imageData.length,
+          updated: results.updated.length,
+          notFound: results.notFound.length,
+          errors: results.errors.length
+        },
+        timestamp: new Date().toISOString(),
+        results: {
+          updated: cleanResults,
+          notFound: results.notFound,
+          errors: results.errors
+        }
+      });
+
+    } catch (error) {
+      console.error('Process image data sync error:', error);
+      res.status(500).json({
+        error: 'Failed to process image data',
+        details: error.message
+      });
+    }
+  }
+
+  // OLD METHOD - Keep for backward compatibility if needed
   static async uploadProductImages(req, res) {
     try {
       console.log('🔍 Image Upload Request body:', req.body);
@@ -1052,7 +1304,7 @@ class ProductController {
     }
   }
 
-  // Get simple image template - only groupSku, subSku, mainImage for products with images
+  // Get simple image template - groupSku, subSku, mainImageUrl, galleryImages (products without images first)
   static async getImageTemplate(req, res) {
     try {
       // Build where clause based on user access
@@ -1079,31 +1331,67 @@ class ProductController {
         whereClause.brandId = { in: accessibleBrandIds };
       }
       
-      // Get all products
+      // Get all products with image fields
       const products = await prisma.product.findMany({
         where: whereClause,
         select: {
           groupSku: true,
           subSku: true,
-          attributes: true
+          mainImageUrl: true,
+          galleryImages: true
+        },
+        orderBy: {
+          groupSku: 'asc'
         }
       });
+      
+      // Get base URL from environment
+      const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'http://192.168.0.23:5000';
+      
+      // Helper function to prepend base URL to local paths
+      const prependBaseUrl = (imagePath) => {
+        if (!imagePath || imagePath.trim() === '') return '';
+        
+        // If already a full URL (starts with http:// or https://), return as is
+        if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+          return imagePath;
+        }
+        
+        // If local path (starts with /uploads/), prepend base URL
+        if (imagePath.startsWith('/uploads/')) {
+          // Fix old path naming
+          let fixedPath = imagePath.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+          return `${IMAGE_BASE_URL}${fixedPath}`;
+        }
+        
+        // Otherwise return as is
+        return imagePath;
+      };
       
       // Separate products with and without images
       const productsWithoutImages = [];
       const productsWithImages = [];
       
       products.forEach(product => {
-        const attributes = product.attributes || {};
-        const hasMainImage = attributes.mainImageUrl && attributes.mainImageUrl.trim() !== '';
-        const hasGalleryImages = attributes.galleryImages && Array.isArray(attributes.galleryImages) && attributes.galleryImages.length > 0;
+        const hasMainImage = product.mainImageUrl && product.mainImageUrl.trim() !== '';
+        const hasGalleryImages = product.galleryImages && Array.isArray(product.galleryImages) && product.galleryImages.length > 0;
         const hasImages = hasMainImage || hasGalleryImages;
+        
+        // Process main image URL
+        const mainImageWithBaseUrl = prependBaseUrl(product.mainImageUrl);
+        
+        // Process gallery images and format as comma-separated string for Excel
+        let galleryImagesStr = '';
+        if (product.galleryImages && Array.isArray(product.galleryImages)) {
+          const galleryWithBaseUrls = product.galleryImages.map(img => prependBaseUrl(img));
+          galleryImagesStr = galleryWithBaseUrls.join(',');
+        }
         
         const productData = {
           groupSku: product.groupSku,
           subSku: product.subSku || '',
-          mainImage: attributes.mainImageUrl || '',
-          galleryImages: attributes.galleryImages || []
+          mainImageUrl: mainImageWithBaseUrl,
+          galleryImages: galleryImagesStr
         };
         
         if (hasImages) {
@@ -1113,17 +1401,19 @@ class ProductController {
         }
       });
       
-      // Combine data: products without images first, then products with images
+      // Combine data: products WITHOUT images first, then products WITH images
       const templateData = [...productsWithoutImages, ...productsWithImages];
       
       res.json({
-        message: 'Image template data retrieved successfully',
+        message: 'Image template data retrieved successfully - Products without images shown first',
         timestamp: new Date().toISOString(),
         summary: {
           totalProducts: products.length,
-          productsWithImages: productsWithImages.length,
-          productsWithoutImages: products.length - productsWithImages.length
+          productsWithoutImages: productsWithoutImages.length,
+          productsWithImages: productsWithImages.length
         },
+        columns: ['groupSku', 'subSku', 'mainImageUrl', 'galleryImages'],
+        imageBaseUrl: IMAGE_BASE_URL,
         templateData: templateData
       });
       
@@ -1538,58 +1828,6 @@ class ProductController {
     }
   }
 
-  // Debug endpoint to test Excel file processing
-  static async debugExcelFile(req, res) {
-    try {
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: 'No file uploaded'
-        });
-      }
-
-      console.log('🔍 DEBUG: Processing file for analysis...');
-      console.log('📁 File info:', {
-        originalName: req.file.originalname,
-        filename: req.file.filename,
-        size: req.file.size,
-        mimetype: req.file.mimetype
-      });
-
-      // Process the file to see what data we get
-      const processedData = await FileProcessor.processFileBuffer(req.file.buffer, req.file.originalname);
-      
-      console.log('📊 DEBUG: Processed data sample (first 2 records):');
-      if (processedData && processedData.length > 0) {
-        console.log('🔍 First record fields:', Object.keys(processedData[0]));
-        console.log('🔍 First record data:', processedData[0]);
-        if (processedData.length > 1) {
-          console.log('🔍 Second record data:', processedData[1]);
-        }
-      }
-
-      res.json({
-        success: true,
-        message: 'File processed successfully for debugging',
-        fileInfo: {
-          originalName: req.file.originalname,
-          filename: req.file.filename,
-          size: req.file.size,
-          mimetype: req.file.mimetype
-        },
-        dataSample: processedData ? processedData.slice(0, 2) : [],
-        totalRecords: processedData ? processedData.length : 0,
-        firstRecordFields: processedData && processedData.length > 0 ? Object.keys(processedData[0]) : []
-      });
-    } catch (error) {
-      console.error('❌ DEBUG: Error processing file:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to process file for debugging',
-        error: error.message
-      });
-    }
-  }
 }
 
 export default ProductController;
