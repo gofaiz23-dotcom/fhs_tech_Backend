@@ -1,7 +1,6 @@
 import UserModel from '../models/User.js';
 import UserLoginHistoryModel from '../models/UserLoginHistory.js';
 import { hashPassword } from '../utils/bcrypt.js';
-import ManagementLogger from '../utils/managementLogger.js';
 
 class AdminController {
   // API 1: Get users basic details only (email, role) with pagination
@@ -169,15 +168,6 @@ class AdminController {
       // Update email
       const updatedUser = await UserModel.updateEmail(userId, email);
 
-      // Log the management action
-      await ManagementLogger.logUserAction(
-        req.user.userId,
-        'EMAIL_CHANGE',
-        userId,
-        { oldEmail: existingUser.email, newEmail: email },
-        req
-      );
-
       res.json({
         message: 'User email updated successfully',
         user: updatedUser
@@ -216,15 +206,6 @@ class AdminController {
       // Update username
       const updatedUser = await UserModel.updateUsername(userId, username);
 
-      // Log the management action
-      await ManagementLogger.logUserAction(
-        req.user.userId,
-        'USERNAME_CHANGE',
-        userId,
-        { oldUsername: existingUser.username, newUsername: username },
-        req
-      );
-
       res.json({
         message: 'User username updated successfully',
         user: updatedUser
@@ -257,15 +238,6 @@ class AdminController {
 
       // Update password
       const updatedUser = await UserModel.updatePassword(userId, passwordHash);
-
-      // Log the management action
-      await ManagementLogger.logUserAction(
-        req.user.userId,
-        'PASSWORD_CHANGE',
-        userId,
-        { message: 'Password updated by admin' },
-        req
-      );
 
       res.json({
         message: 'User password updated successfully',
@@ -304,15 +276,6 @@ class AdminController {
       // Update role
       const updatedUser = await UserModel.updateRole(userId, role);
 
-      // Log the management action
-      await ManagementLogger.logUserAction(
-        req.user.userId,
-        'ROLE_CHANGE',
-        userId,
-        { oldRole: existingUser.role, newRole: role },
-        req
-      );
-
       res.json({
         message: 'User role updated successfully',
         user: updatedUser
@@ -348,15 +311,6 @@ class AdminController {
 
       // Delete user (this will cascade delete related records)
       await UserModel.delete(userId);
-
-      // Log the management action
-      await ManagementLogger.logUserAction(
-        req.user.userId,
-        'DELETE',
-        userId,
-        { deletedUser: existingUser.email, deletedUsername: existingUser.username },
-        req
-      );
 
       res.json({
         message: 'User deleted successfully',

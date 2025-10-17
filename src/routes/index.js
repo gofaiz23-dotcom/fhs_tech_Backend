@@ -10,8 +10,6 @@ import listingRoutes from './listingRoutes.js';
 import settingRoutes from './settingRoutes.js';
 import inventoryRoutes from './inventoryRoutes.js';
 import permissionRoutes from './permissionRoutes.js';
-import managementHistoryRoutes from './managementHistoryRoutes.js';
-import userActivityRoutes from './userActivityRoutes.js';
 import dbConnection from '../config/database.js';
 
 const router = express.Router();
@@ -28,8 +26,6 @@ router.use('/listings', listingRoutes);
 router.use('/settings', settingRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/users', permissionRoutes);
-router.use('/management', managementHistoryRoutes);
-router.use('/activities', userActivityRoutes);
 
 // Health check route
 router.get('/health', async (req, res) => {
@@ -95,8 +91,6 @@ router.get('/', (req, res) => {
       settings: '/api/settings',
       inventory: '/api/inventory',
       permissions: '/api/users',
-      management: '/api/management',
-      activities: '/api/activities',
       health: '/api/health'
     }
   });

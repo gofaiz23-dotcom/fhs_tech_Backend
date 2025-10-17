@@ -1,5 +1,4 @@
 import ProductModel from '../models/Product.js';
-import ManagementLogger from '../utils/managementLogger.js';
 import queueService from '../services/queueService.js';
 import { prisma } from '../config/database.js';
 import { processImage, processImages } from '../utils/imageDownloader.js';
@@ -557,16 +556,6 @@ class ProductController {
 
           results.created.push(productWithFullUrls);
 
-          // Log management action
-          await ManagementLogger.logProductAction(
-            req.user.userId,
-            'CREATE',
-            product.id,
-            brand.id,
-            { oldData: null, newData: product },
-            req
-          );
-
         } catch (error) {
           results.errors.push({
             title: productData.title,
@@ -659,16 +648,6 @@ class ProductController {
         attributes
       });
 
-      // Log management action
-      await ManagementLogger.logProductAction(
-        req.user.userId,
-        'UPDATE',
-        productId,
-        existingProduct.brandId,
-        { oldData: existingProduct, newData: updatedProduct },
-        req
-      );
-
       res.json({
         message: 'Product updated successfully',
         productId: productId,
@@ -717,16 +696,6 @@ class ProductController {
 
       await ProductModel.delete(productId);
 
-      // Log management action
-      await ManagementLogger.logProductAction(
-        req.user.userId,
-        'DELETE',
-        productId,
-        existingProduct.brandId,
-        { oldData: existingProduct, newData: null },
-        req
-      );
-
       res.json({
         message: 'Product deleted successfully'
       });
@@ -751,16 +720,6 @@ class ProductController {
       }
 
       const deletedCount = await ProductModel.deleteAll();
-
-      // Log management action
-      await ManagementLogger.logProductAction(
-        req.user.userId,
-        'DELETE_ALL',
-        null,
-        null,
-        { deletedCount: deletedCount.count },
-        req
-      );
 
       res.json({
         message: 'All products deleted successfully',
@@ -968,20 +927,6 @@ class ProductController {
             mainImageUrl: finalMainImage,
             galleryImagesCount: finalGalleryImages.length
           });
-
-          // Log management action
-          await ManagementLogger.logProductAction(
-            req.user.userId,
-            'UPDATE_IMAGES',
-            product.id,
-            product.brandId,
-            { 
-              groupSku: item.groupSku,
-              mainImageUrl: finalMainImage,
-              galleryImagesCount: finalGalleryImages.length
-            },
-            req
-          );
 
         } catch (error) {
           results.errors.push({
@@ -1258,21 +1203,6 @@ class ProductController {
               where: { id: product.id },
               data: { attributes: newAttributes }
             });
-
-            // Log management action
-            await ManagementLogger.logProductAction(
-              req.user.userId,
-              'UPDATE_IMAGES',
-              product.id,
-              product.brandId,
-              { 
-                oldImages: currentAttributes,
-                newImages: newAttributes,
-                uploadedCount: results.uploadedFiles.length,
-                downloadedCount: results.downloadedUrls.length
-              },
-              req
-            );
           }
         } catch (error) {
           console.error('Error updating product attributes:', error);

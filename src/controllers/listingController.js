@@ -1,6 +1,5 @@
 import ListingModel from '../models/Listing.js';
 import InventoryModel from '../models/Inventory.js';
-import ManagementLogger from '../utils/managementLogger.js';
 import { prisma } from '../config/database.js';
 import { processImage, processImages } from '../utils/imageDownloader.js';
 
@@ -788,16 +787,6 @@ class ListingController {
 
           results.created.push(listingWithFullUrls);
 
-          // Log management action
-          await ManagementLogger.logListingAction(
-            req.user.userId,
-            'CREATE',
-            listing.id,
-            brand.id,
-            { oldData: null, newData: listing, linkedProduct: product },
-            req
-          );
-
         } catch (error) {
           results.errors.push({
             title: listingData.title,
@@ -900,16 +889,6 @@ class ListingController {
         attributes
       });
 
-      // Log management action
-      await ManagementLogger.logListingAction(
-        req.user.userId,
-        'UPDATE',
-        listingId,
-        existingListing.brandId,
-        { oldData: existingListing, newData: updatedListing },
-        req
-      );
-
       res.json({
         message: 'Listing updated successfully',
         listingId: listingId,
@@ -958,16 +937,6 @@ class ListingController {
 
       await ListingModel.delete(listingId);
 
-      // Log management action
-      await ManagementLogger.logListingAction(
-        req.user.userId,
-        'DELETE',
-        listingId,
-        existingListing.brandId,
-        { oldData: existingListing, newData: null },
-        req
-      );
-
       res.json({
         message: 'Listing deleted successfully'
       });
@@ -992,16 +961,6 @@ class ListingController {
       }
 
       const deletedCount = await ListingModel.deleteAll();
-
-      // Log management action
-      await ManagementLogger.logListingAction(
-        req.user.userId,
-        'DELETE_ALL',
-        null,
-        null,
-        { deletedCount: deletedCount.count },
-        req
-      );
 
       res.json({
         message: 'All listings deleted successfully',
@@ -1333,20 +1292,6 @@ class ListingController {
             mainImageUrl: finalMainImage,
             galleryImagesCount: finalGalleryImages.length
           });
-
-          // Log management action
-          await ManagementLogger.logListingAction(
-            req.user.userId,
-            'UPDATE_IMAGES',
-            listing.id,
-            listing.brandId,
-            { 
-              sku: item.sku,
-              mainImageUrl: finalMainImage,
-              galleryImagesCount: finalGalleryImages.length
-            },
-            req
-          );
 
         } catch (error) {
           results.errors.push({

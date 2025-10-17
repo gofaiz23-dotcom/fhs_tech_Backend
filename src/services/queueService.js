@@ -2,7 +2,6 @@ import Queue from 'bull';
 import Redis from 'ioredis';
 import { v4 as uuidv4 } from 'uuid';
 import ProductModel from '../models/Product.js';
-import ManagementLogger from '../utils/managementLogger.js';
 import { prisma } from '../config/database.js';
 
 class QueueService {
@@ -363,15 +362,6 @@ class QueueService {
         });
 
         results.created.push(product);
-
-        await ManagementLogger.logProductAction(
-          userId,
-          'CREATE_BULK',
-          product.id,
-          brand.id,
-          { oldData: null, newData: product },
-          { jobId: data.jobId }
-        );
 
       } catch (error) {
         results.errors.push({

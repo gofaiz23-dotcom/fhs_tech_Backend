@@ -26,17 +26,6 @@ model User {
   userMarketplaceAccess UserMarketplaceAccess[]
   userShippingAccess   UserShippingAccess[]
   loginHistory         UserLoginHistory[]
-  
-  // Management History Relations
-  adminActions UserManagementHistory[] @relation("AdminActions")
-  targetUserActions UserManagementHistory[] @relation("TargetUserActions")
-  adminBrandActions BrandManagementHistory[] @relation("AdminBrandActions")
-  adminMarketplaceActions MarketplaceManagementHistory[] @relation("AdminMarketplaceActions")
-  adminShippingActions ShippingManagementHistory[] @relation("AdminShippingActions")
-  adminPermissionActions PermissionManagementHistory[] @relation("AdminPermissionActions")
-  targetUserPermissionActions PermissionManagementHistory[] @relation("TargetUserPermissionActions")
-  productActions ProductManagementHistory[] @relation("UserProductActions")
-  listingActions ListingManagementHistory[] @relation("UserListingActions")
 
   @@map("users")
   @@index([email])
@@ -59,10 +48,7 @@ model Brand {
 
   // Relations
   userBrandAccess UserBrandAccess[]
-  managementHistory BrandManagementHistory[]
-  productActions ProductManagementHistory[] @relation("BrandProductActions")
   products Product[]
-  listingActions ListingManagementHistory[] @relation("BrandListingActions")
   listings Listing[]
   inventory Inventory[]
 
@@ -81,7 +67,6 @@ model Marketplace {
 
   // Relations
   userMarketplaceAccess UserMarketplaceAccess[]
-  managementHistory MarketplaceManagementHistory[]
 
   @@map("marketplaces")
   @@index([name])
@@ -98,7 +83,6 @@ model ShippingCompany {
 
   // Relations
   userShippingAccess UserShippingAccess[]
-  managementHistory ShippingManagementHistory[]
 
   @@map("shipping_companies")
   @@index([name])
@@ -204,142 +188,6 @@ model UserLoginHistory {
   @@index([createdAt])
 }
 
-// Management History Tables
-model UserManagementHistory {
-  id          Int      @id @default(autoincrement())
-  adminId     Int      @map("admin_id")
-  targetUserId Int?    @map("target_user_id")
-  action      String   // CREATE, UPDATE, DELETE, ROLE_CHANGE, EMAIL_CHANGE, PASSWORD_CHANGE
-  details     Json?    // Additional details like old/new values
-  ipAddress   String?  @map("ip_address")
-  userAgent   String?  @map("user_agent")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  // Relations
-  admin       User     @relation("AdminActions", fields: [adminId], references: [id], onDelete: Cascade)
-  targetUser  User?    @relation("TargetUserActions", fields: [targetUserId], references: [id], onDelete: SetNull)
-
-  @@map("user_management_history")
-  @@index([adminId])
-  @@index([targetUserId])
-  @@index([action])
-  @@index([createdAt])
-}
-
-model BrandManagementHistory {
-  id          Int      @id @default(autoincrement())
-  adminId     Int      @map("admin_id")
-  brandId     Int      @map("brand_id")
-  action      String   // CREATE, UPDATE, DELETE
-  details     Json?    // Additional details like old/new values
-  ipAddress   String?  @map("ip_address")
-  userAgent   String?  @map("user_agent")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  // Relations
-  admin       User     @relation("AdminBrandActions", fields: [adminId], references: [id], onDelete: Cascade)
-  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-
-  @@map("brand_management_history")
-  @@index([adminId])
-  @@index([brandId])
-  @@index([action])
-  @@index([createdAt])
-}
-
-model MarketplaceManagementHistory {
-  id          Int      @id @default(autoincrement())
-  adminId     Int      @map("admin_id")
-  marketplaceId Int    @map("marketplace_id")
-  action      String   // CREATE, UPDATE, DELETE
-  details     Json?    // Additional details like old/new values
-  ipAddress   String?  @map("ip_address")
-  userAgent   String?  @map("user_agent")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  // Relations
-  admin       User     @relation("AdminMarketplaceActions", fields: [adminId], references: [id], onDelete: Cascade)
-  marketplace Marketplace @relation(fields: [marketplaceId], references: [id], onDelete: Cascade)
-
-  @@map("marketplace_management_history")
-  @@index([adminId])
-  @@index([marketplaceId])
-  @@index([action])
-  @@index([createdAt])
-}
-
-model ShippingManagementHistory {
-  id          Int      @id @default(autoincrement())
-  adminId     Int      @map("admin_id")
-  shippingId  Int      @map("shipping_id")
-  action      String   // CREATE, UPDATE, DELETE
-  details     Json?    // Additional details like old/new values
-  ipAddress   String?  @map("ip_address")
-  userAgent   String?  @map("user_agent")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  // Relations
-  admin       User     @relation("AdminShippingActions", fields: [adminId], references: [id], onDelete: Cascade)
-  shipping    ShippingCompany @relation(fields: [shippingId], references: [id], onDelete: Cascade)
-
-  @@map("shipping_management_history")
-  @@index([adminId])
-  @@index([shippingId])
-  @@index([action])
-  @@index([createdAt])
-}
-
-// Permission Management History
-model PermissionManagementHistory {
-  id          Int      @id @default(autoincrement())
-  adminId     Int      @map("admin_id")
-  targetUserId Int    @map("target_user_id")
-  entityType  String   // BRAND, MARKETPLACE, SHIPPING
-  entityId    Int      @map("entity_id")
-  action      String   // GRANT, REVOKE, TOGGLE
-  details     Json?    // Additional details like old/new access status
-  ipAddress   String?  @map("ip_address")
-  userAgent   String?  @map("user_agent")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  // Relations
-  admin       User     @relation("AdminPermissionActions", fields: [adminId], references: [id], onDelete: Cascade)
-  targetUser  User     @relation("TargetUserPermissionActions", fields: [targetUserId], references: [id], onDelete: Cascade)
-
-  @@map("permission_management_history")
-  @@index([adminId])
-  @@index([targetUserId])
-  @@index([entityType])
-  @@index([entityId])
-  @@index([action])
-  @@index([createdAt])
-}
-
-// Product Management History (Future)
-model ProductManagementHistory {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")        // User who added the product
-  brandId     Int      @map("brand_id")       // Brand for which product was added
-  productId   Int?     @map("product_id")     // Product ID (if available)
-  action      String   // ADD, UPDATE, DELETE, BULK_ADD
-  details     Json?    // Product details, old/new values
-  ipAddress   String?  @map("ip_address")
-  userAgent   String?  @map("user_agent")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  // Relations
-  user        User     @relation("UserProductActions", fields: [userId], references: [id], onDelete: Cascade)
-  brand       Brand    @relation("BrandProductActions", fields: [brandId], references: [id], onDelete: Cascade)
-  product     Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@map("product_management_history")
-  @@index([userId])
-  @@index([brandId])
-  @@index([productId])
-  @@index([action])
-  @@index([createdAt])
-}
-
 // 10. Products Table
 model Product {
   id          Int      @id @default(autoincrement())
@@ -375,7 +223,6 @@ model Product {
 
   // Relations
   brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  productHistory ProductManagementHistory[]
   listings Listing[]
 
   @@map("products")
@@ -428,7 +275,6 @@ model Listing {
   // Relations
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  listingHistory ListingManagementHistory[]
   inventory   Inventory[]
 
   @@map("listings")
@@ -439,31 +285,6 @@ model Listing {
   @@index([createdAt])
   @@index([brandId, category])
   @@index([brandId, ecommercePrice])
-}
-
-// Listing Management History
-model ListingManagementHistory {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")        // User who performed the action
-  brandId     Int      @map("brand_id")       // Brand for which listing was managed
-  listingId   Int?     @map("listing_id")     // Listing ID (if available)
-  action      String   // CREATE, UPDATE, DELETE, BULK_CREATE, DELETE_ALL
-  details     Json?    // Listing details, old/new values
-  ipAddress   String?  @map("ip_address")
-  userAgent   String?  @map("user_agent")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  // Relations
-  user        User     @relation("UserListingActions", fields: [userId], references: [id], onDelete: Cascade)
-  brand       Brand    @relation("BrandListingActions", fields: [brandId], references: [id], onDelete: Cascade)
-  listing     Listing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
-
-  @@map("listing_management_history")
-  @@index([userId])
-  @@index([brandId])
-  @@index([listingId])
-  @@index([action])
-  @@index([createdAt])
 }
 
 // 12. Settings Table

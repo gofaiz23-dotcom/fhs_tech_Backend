@@ -1,6 +1,5 @@
 import ProductModel from '../models/Product.js';
 import { prisma } from '../config/database.js';
-import ManagementLogger from '../utils/managementLogger.js';
 import queueService from '../services/queueService.js';
 
 class ProductPricingController {
@@ -202,39 +201,6 @@ class ProductPricingController {
         ecommercePrice: newEcommercePrice,
         msrp: msrp !== undefined ? parseFloat(msrp) : existingProduct.msrp
       });
-
-      // Log management action
-      await ManagementLogger.logProductAction(
-        req.user.userId,
-        'UPDATE_PRICING',
-        parseInt(productId),
-        existingProduct.brandId,
-        { 
-          oldData: {
-            brandRealPrice: existingProduct.brandRealPrice,
-            brandMiscellaneous: existingProduct.brandMiscellaneous,
-            brandPrice: existingProduct.brandPrice,
-            shippingPrice: existingProduct.shippingPrice,
-            commissionPrice: existingProduct.commissionPrice,
-            profitMarginPrice: existingProduct.profitMarginPrice,
-            ecommerceMiscellaneous: existingProduct.ecommerceMiscellaneous,
-            ecommercePrice: existingProduct.ecommercePrice,
-            msrp: existingProduct.msrp
-          }, 
-          newData: {
-            brandRealPrice: updatedProduct.brandRealPrice,
-            brandMiscellaneous: updatedProduct.brandMiscellaneous,
-            brandPrice: newBrandPrice,
-            shippingPrice: updatedProduct.shippingPrice,
-            commissionPrice: updatedProduct.commissionPrice,
-            profitMarginPrice: updatedProduct.profitMarginPrice,
-            ecommerceMiscellaneous: updatedProduct.ecommerceMiscellaneous,
-            ecommercePrice: newEcommercePrice,
-            msrp: updatedProduct.msrp
-          }
-        },
-        req
-      );
 
       res.json({
         message: 'Product pricing updated successfully',
