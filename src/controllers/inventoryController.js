@@ -236,8 +236,8 @@ class InventoryController {
 
       for (const item of inventoryData) {
         try {
-          // Find inventory by subSku
-          const inventory = await prisma.inventory.findFirst({
+          // Find inventory by subSku (now unique - faster lookup)
+          const inventory = await prisma.inventory.findUnique({
             where: { subSku: item.subSku },
             include: {
               brand: true,

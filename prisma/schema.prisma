@@ -480,10 +480,10 @@ model Setting {
 // 13. Inventory Table
 model Inventory {
   id        Int      @id @default(autoincrement())
-  listingId Int      @map("listing_id")  // Reference to Listing
+  listingId Int      @map("listing_id")  // Reference to Listing (first listing that used this subSku)
   brandId   Int      @map("brand_id")    // Brand for access control
-  subSku    String   @map("sub_sku")     // One subSku per row (not comma-separated)
-  quantity  Int      @default(0)         // Quantity for this subSku
+  subSku    String   @unique @map("sub_sku")  // One subSku per row - UNIQUE across all listings
+  quantity  Int      @default(0)         // Quantity for this subSku (shared across all listings)
   eta       String?                      // Estimated Time of Arrival
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

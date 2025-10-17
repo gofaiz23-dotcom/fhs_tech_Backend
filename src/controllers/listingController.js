@@ -109,24 +109,59 @@ class ListingController {
 
       const result = await ListingModel.findAll(req.user.userId, req.user.role, page, limit, filters);
 
-      // Add computed inventory fields to each listing
-      const listingsWithInventoryStats = result.listings.map(listing => {
+      // Fetch inventory for each listing by matching subSkus (since inventory is now globally unique)
+      const listingsWithInventoryStats = await Promise.all(result.listings.map(async (listing) => {
         const inventoryArray = [];
         let minQuantity = 0;
         let status = 'Out of Stock';  // Default status
+        let inventoryRecords = [];
         
-        if (listing.inventory && listing.inventory.length > 0) {
-          // Extract quantities from inventory
-          const quantities = listing.inventory.map(inv => inv.quantity);
-          inventoryArray.push(...quantities);
+        // Parse listing's subSkus in order
+        if (listing.subSku) {
+          const subSkus = listing.subSku.split(',').map(s => s.trim()).filter(s => s);
           
-          // Calculate minimum quantity
-          if (quantities.length === 1) {
+          // Fetch all inventory records that match these subSkus
+          const fetchedInventory = await prisma.inventory.findMany({
+            where: {
+              subSku: { in: subSkus }
+            },
+            select: {
+              id: true,
+              subSku: true,
+              quantity: true,
+              eta: true,
+              createdAt: true,
+              updatedAt: true
+            }
+          });
+          
+          // Create a map for quick lookup: subSku -> inventory record
+          const inventoryMap = new Map();
+          fetchedInventory.forEach(inv => {
+            inventoryMap.set(inv.subSku, inv);
+          });
+          
+          // Build inventory array in the SAME ORDER as listing's subSkus
+          for (const subSku of subSkus) {
+            const inv = inventoryMap.get(subSku);
+            if (inv) {
+              inventoryRecords.push(inv);
+              inventoryArray.push(inv.quantity);
+            } else {
+              // SubSku exists in listing but no inventory record found
+              inventoryArray.push(0);  // Default to 0 if not found
+            }
+          }
+        }
+        
+        // Calculate minimum quantity from inventoryArray
+        if (inventoryArray.length > 0) {
+          if (inventoryArray.length === 1) {
             // Single subSku - show direct value
-            minQuantity = quantities[0];
+            minQuantity = inventoryArray[0];
           } else {
             // Multiple subSkus - show minimum value
-            minQuantity = Math.min(...quantities);
+            minQuantity = Math.min(...inventoryArray);
           }
         }
         
@@ -141,11 +176,12 @@ class ListingController {
         
         return {
           ...listing,
-          inventoryArray: inventoryArray,  // Array of all quantities
+          inventory: inventoryRecords,  // Inventory records in subSku order
+          inventoryArray: inventoryArray,  // Quantities in SAME order as subSkus
           quantity: minQuantity,            // Min quantity (or direct if single)
           status: status                    // Stock status
         };
-      });
+      }));
 
       // Calculate duplicate statistics
       const duplicateGroups = {};
@@ -694,27 +730,40 @@ class ListingController {
             attributes: finalAttributes
           });
 
-          // STEP 7: Auto-create inventory items from listing's subSku
+          // STEP 7: Auto-create inventory items from listing's subSku (check for existing first)
           let inventoryItems = [];
           try {
             const subSkus = listingData.subSku.split(',').map(s => s.trim()).filter(s => s);
             
             for (const subSku of subSkus) {
-              const item = await prisma.inventory.create({
-                data: {
-                  listingId: listing.id,
-                  brandId: brand.id,
-                  subSku: subSku,
-                  quantity: 0,  // Default: 0
-                  eta: null     // Default: null
-                }
+              // Check if inventory already exists for this subSku (globally unique)
+              let existingInventory = await prisma.inventory.findUnique({
+                where: { subSku: subSku }
               });
-              inventoryItems.push(item);
+              
+              if (existingInventory) {
+                // Inventory already exists - reuse it
+                console.log(`ℹ️ Inventory already exists for subSku: ${subSku} (ID: ${existingInventory.id})`);
+                inventoryItems.push(existingInventory);
+              } else {
+                // Create new inventory record
+                const item = await prisma.inventory.create({
+                  data: {
+                    listingId: listing.id,
+                    brandId: brand.id,
+                    subSku: subSku,
+                    quantity: 0,  // Default: 0
+                    eta: null     // Default: null
+                  }
+                });
+                inventoryItems.push(item);
+                console.log(`✅ Created new inventory for subSku: ${subSku} (ID: ${item.id})`);
+              }
             }
             
-            console.log(`✅ Created ${inventoryItems.length} inventory items for listing ${listing.id}`);
+            console.log(`✅ Processed ${inventoryItems.length} inventory items for listing ${listing.id} (${inventoryItems.filter(i => i.listingId === listing.id).length} new, ${inventoryItems.filter(i => i.listingId !== listing.id).length} existing)`);
           } catch (error) {
-            console.error('Failed to create inventory items:', error);
+            console.error('Failed to process inventory items:', error);
           }
 
           // Add inventory data to listing response
