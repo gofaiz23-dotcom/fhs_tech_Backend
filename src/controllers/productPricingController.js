@@ -1,6 +1,7 @@
 import ProductModel from '../models/Product.js';
 import { prisma } from '../config/database.js';
-import queueService from '../services/queueService.js';
+import jobTracker from '../services/jobTracker.js';
+import BackgroundProcessor from '../services/backgroundProcessor.js';
 
 class ProductPricingController {
   // Helper method for validating and converting price values
@@ -400,16 +401,58 @@ class ProductPricingController {
       }
 
       // For large datasets, use background processing
-      const jobResult = await queueService.addBulkPricingJob({
-        pricingData: validPricingData
-      }, req.user.userId);
+      const jobId = await BackgroundProcessor.processBulk(
+        req.user.userId,
+        'PRICING_UPDATE',
+        validPricingData,
+        async (pricingItem) => {
+          // Find product
+          let existingProduct;
+          if (pricingItem.productId) {
+            existingProduct = await ProductModel.findById(pricingItem.productId);
+          } else if (pricingItem.subSku) {
+            existingProduct = await ProductModel.findBySubSku(pricingItem.subSku);
+          } else if (pricingItem.groupSku) {
+            existingProduct = await ProductModel.findByGroupSku(pricingItem.groupSku);
+          }
+
+          if (!existingProduct) {
+            throw new Error(`Product not found: ${pricingItem.productId || pricingItem.subSku || pricingItem.groupSku}`);
+          }
+
+          // Calculate new prices
+          const newBrandPrice = parseFloat(pricingItem.brandRealPrice || existingProduct.brandRealPrice) + 
+                               parseFloat(pricingItem.brandMiscellaneous || existingProduct.brandMiscellaneous);
+          
+          const newEcommercePrice = newBrandPrice + 
+                                   parseFloat(pricingItem.shippingPrice || existingProduct.shippingPrice) + 
+                                   parseFloat(pricingItem.commissionPrice || existingProduct.commissionPrice) + 
+                                   parseFloat(pricingItem.profitMarginPrice || existingProduct.profitMarginPrice) + 
+                                   parseFloat(pricingItem.ecommerceMiscellaneous || existingProduct.ecommerceMiscellaneous);
+
+          // Update product pricing
+          return await ProductModel.update(existingProduct.id, {
+            brandRealPrice: pricingItem.brandRealPrice !== undefined ? parseFloat(pricingItem.brandRealPrice) : existingProduct.brandRealPrice,
+            brandMiscellaneous: pricingItem.brandMiscellaneous !== undefined ? parseFloat(pricingItem.brandMiscellaneous) : existingProduct.brandMiscellaneous,
+            brandPrice: newBrandPrice,
+            shippingPrice: pricingItem.shippingPrice !== undefined ? parseFloat(pricingItem.shippingPrice) : existingProduct.shippingPrice,
+            commissionPrice: pricingItem.commissionPrice !== undefined ? parseFloat(pricingItem.commissionPrice) : existingProduct.commissionPrice,
+            profitMarginPrice: pricingItem.profitMarginPrice !== undefined ? parseFloat(pricingItem.profitMarginPrice) : existingProduct.profitMarginPrice,
+            ecommerceMiscellaneous: pricingItem.ecommerceMiscellaneous !== undefined ? parseFloat(pricingItem.ecommerceMiscellaneous) : existingProduct.ecommerceMiscellaneous,
+            ecommercePrice: newEcommercePrice,
+            msrp: pricingItem.msrp !== undefined ? parseFloat(pricingItem.msrp) : existingProduct.msrp
+          });
+        },
+        100 // Batch size
+      );
 
       res.status(202).json({
         message: `Large pricing dataset detected (${validPricingData.length} products). Processing in background.`,
-        jobId: jobResult.jobId,
-        status: jobResult.status,
+        jobId: jobId,
+        status: 'PROCESSING',
         totalProducts: validPricingData.length,
-        estimatedTime: `${Math.ceil(validPricingData.length / 200)} minutes`,
+        estimatedTime: `${Math.ceil(validPricingData.length / 100)} minutes`,
+        checkStatus: `/api/products/status?jobId=${jobId}`,
         timestamp: new Date().toISOString()
       });
 

@@ -2,6 +2,8 @@ import ListingModel from '../models/Listing.js';
 import InventoryModel from '../models/Inventory.js';
 import { prisma } from '../config/database.js';
 import { processImage, processImages } from '../utils/imageDownloader.js';
+import jobTracker from '../services/jobTracker.js';
+import BackgroundProcessor from '../services/backgroundProcessor.js';
 
 class ListingController {
   // Helper method to normalize field names (case-insensitive)
@@ -1189,19 +1191,39 @@ class ListingController {
 
       // For large datasets, use background processing
       console.log('🚀 Large dataset detected, using background processing...');
-      const queueService = (await import('../services/queueService.js')).default;
-      const jobResult = await queueService.addBulkImageJob({
-        imageData: imageData,
-        userId: req.user.userId,
-        type: 'listing'
-      }, req.user.userId);
+      
+      const jobId = await BackgroundProcessor.processBulk(
+        req.user.userId,
+        'LISTING_IMAGE',
+        imageData,
+        async (item) => {
+          const listing = await ListingModel.findBySku(item.sku);
+          if (!listing) {
+            throw new Error(`Listing not found: ${item.sku}`);
+          }
+
+          // Process images
+          const mainImage = item.mainImageUrl ? await processImage(item.mainImageUrl) : listing.mainImageUrl;
+          const galleryImages = item.galleryImages && Array.isArray(item.galleryImages) 
+            ? await processImages(item.galleryImages)
+            : listing.galleryImages;
+
+          // Update listing
+          return await ListingModel.update(listing.id, {
+            mainImageUrl: mainImage,
+            galleryImages: galleryImages
+          });
+        },
+        50 // Batch size
+      );
 
       res.status(202).json({
         message: `Large image dataset detected (${imageData.length} listings). Processing in background.`,
-        jobId: jobResult.jobId,
-        status: jobResult.status,
+        jobId: jobId,
+        status: 'PROCESSING',
         totalListings: imageData.length,
         estimatedTime: `${Math.ceil(imageData.length / 50)} minutes`,
+        checkStatus: `/api/listings/status?jobId=${jobId}`,
         note: 'Use GET /api/listings/status to check progress',
         timestamp: new Date().toISOString(),
         fileInfo: req.file ? {
@@ -1337,36 +1359,78 @@ class ListingController {
     }
   }
 
-  // Get bulk processing status (for listings)
+  // Get bulk processing status - Shows all listing background jobs
   static async getBulkStatus(req, res) {
     try {
-      const queueService = (await import('../services/queueService.js')).default;
-      const { jobId, queueName } = req.query;
+      const { jobId } = req.query;
 
       // If specific job ID provided
-      if (jobId && queueName) {
-        const jobStatus = await queueService.getJobStatus(queueName, jobId);
+      if (jobId) {
+        const job = jobTracker.getJob(jobId);
+        if (!job) {
+          return res.status(404).json({
+            error: 'Job not found',
+            message: `Job ${jobId} does not exist`
+          });
+        }
+
         return res.json({
-          message: 'Listing job status retrieved successfully',
-          jobStatus,
+          message: 'Job status retrieved successfully',
+          job: {
+            jobId: job.jobId,
+            type: job.type,
+            status: job.status,
+            progress: `${job.progress}%`,
+            total: job.data.total,
+            processed: job.data.processed,
+            success: job.data.success,
+            failed: job.data.failed,
+            errors: job.data.errors || [],
+            startedAt: job.startedAt,
+            completedAt: job.completedAt,
+            duration: job.completedAt 
+              ? `${Math.round((job.completedAt - job.startedAt) / 1000)}s`
+              : `${Math.round((Date.now() - job.startedAt) / 1000)}s`
+          },
           timestamp: new Date().toISOString()
         });
       }
 
-      // Get user's jobs
-      const userJobs = await queueService.getUserJobs(req.user.userId);
+      // Get all listing-related jobs for this user
+      const listingJobs = jobTracker.getJobsByType(req.user.userId, 'LISTING');
+      
+      // Format jobs for response
+      const formattedJobs = listingJobs.map(job => ({
+        jobId: job.jobId,
+        type: job.type,
+        status: job.status,
+        progress: `${job.progress}%`,
+        summary: {
+          total: job.data.total,
+          processed: job.data.processed,
+          success: job.data.success,
+          failed: job.data.failed
+        },
+        recentErrors: (job.data.errors || []).slice(0, 3), // Show 3 recent errors
+        startedAt: job.startedAt,
+        completedAt: job.completedAt,
+        duration: job.completedAt 
+          ? `${Math.round((job.completedAt - job.startedAt) / 1000)}s`
+          : `${Math.round((Date.now() - job.startedAt) / 1000)}s`
+      }));
 
-      // If admin, also get queue statistics
-      let queueStats = null;
+      // Get statistics if admin
+      let stats = null;
       if (req.user.role === 'ADMIN') {
-        queueStats = await queueService.getQueueStats();
+        stats = jobTracker.getStats();
       }
 
       res.json({
-        message: 'Listing bulk processing status retrieved successfully',
+        message: 'Listing background jobs status',
         userRole: req.user.role,
-        userJobs: userJobs,
-        ...(queueStats && { queueStats }),
+        totalJobs: formattedJobs.length,
+        jobs: formattedJobs,
+        ...(stats && { systemStats: stats }),
         timestamp: new Date().toISOString()
       });
 

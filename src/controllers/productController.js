@@ -1,5 +1,5 @@
 import ProductModel from '../models/Product.js';
-import queueService from '../services/queueService.js';
+import jobTracker from '../services/jobTracker.js';
 import { prisma } from '../config/database.js';
 import { processImage, processImages } from '../utils/imageDownloader.js';
 
@@ -1670,35 +1670,78 @@ class ProductController {
     }
   }
 
-  // Get bulk processing status (for users and admin)
+  // Get bulk processing status - Shows all product background jobs
   static async getBulkStatus(req, res) {
     try {
-      const { jobId, queueName } = req.query;
+      const { jobId } = req.query;
 
       // If specific job ID provided
-      if (jobId && queueName) {
-        const jobStatus = await queueService.getJobStatus(queueName, jobId);
+      if (jobId) {
+        const job = jobTracker.getJob(jobId);
+        if (!job) {
+          return res.status(404).json({
+            error: 'Job not found',
+            message: `Job ${jobId} does not exist`
+          });
+        }
+
         return res.json({
           message: 'Job status retrieved successfully',
-          jobStatus,
+          job: {
+            jobId: job.jobId,
+            type: job.type,
+            status: job.status,
+            progress: `${job.progress}%`,
+            total: job.data.total,
+            processed: job.data.processed,
+            success: job.data.success,
+            failed: job.data.failed,
+            errors: job.data.errors || [],
+            startedAt: job.startedAt,
+            completedAt: job.completedAt,
+            duration: job.completedAt 
+              ? `${Math.round((job.completedAt - job.startedAt) / 1000)}s`
+              : `${Math.round((Date.now() - job.startedAt) / 1000)}s`
+          },
           timestamp: new Date().toISOString()
         });
       }
 
-      // Get user's jobs
-      const userJobs = await queueService.getUserJobs(req.user.userId);
+      // Get all product-related jobs for this user
+      const productJobs = jobTracker.getJobsByType(req.user.userId, 'PRODUCT');
+      
+      // Format jobs for response
+      const formattedJobs = productJobs.map(job => ({
+        jobId: job.jobId,
+        type: job.type,
+        status: job.status,
+        progress: `${job.progress}%`,
+        summary: {
+          total: job.data.total,
+          processed: job.data.processed,
+          success: job.data.success,
+          failed: job.data.failed
+        },
+        recentErrors: (job.data.errors || []).slice(0, 3), // Show 3 recent errors
+        startedAt: job.startedAt,
+        completedAt: job.completedAt,
+        duration: job.completedAt 
+          ? `${Math.round((job.completedAt - job.startedAt) / 1000)}s`
+          : `${Math.round((Date.now() - job.startedAt) / 1000)}s`
+      }));
 
-      // If admin, also get queue statistics
-      let queueStats = null;
+      // Get statistics if admin
+      let stats = null;
       if (req.user.role === 'ADMIN') {
-        queueStats = await queueService.getQueueStats();
+        stats = jobTracker.getStats();
       }
 
       res.json({
-        message: 'Bulk processing status retrieved successfully',
+        message: 'Product background jobs status',
         userRole: req.user.role,
-        userJobs: userJobs,
-        ...(queueStats && { queueStats }),
+        totalJobs: formattedJobs.length,
+        jobs: formattedJobs,
+        ...(stats && { systemStats: stats }),
         timestamp: new Date().toISOString()
       });
 

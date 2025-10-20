@@ -13,7 +13,7 @@ router.use(authenticateToken);
 router.get('/', InventoryController.getInventory);                    // 1. Get all inventory (based on user access)
 router.put('/:id', validateId, InventoryController.updateInventory);  // 2. Update inventory (quantity, ETA)
 router.post('/bulk/inventory/updates', uploadSingleHybrid, handleUploadError, InventoryController.bulkUpdateInventory); // 3. Bulk update inventory - Excel/CSV - Unlimited with background processing
-router.get('/inventory/status', InventoryController.getBulkStatus);   // 4. Get bulk inventory update status (all background jobs)
+router.get('/status', InventoryController.getBulkStatus);   // 4. Get bulk inventory update status (all background jobs)
 
 export default router;
 
