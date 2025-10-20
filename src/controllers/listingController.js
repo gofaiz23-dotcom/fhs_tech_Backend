@@ -583,25 +583,23 @@ class ListingController {
             continue;
           }
 
-          console.log('✅ Brand Information (Original):', {
-            brandId: brand.id,
-            brandName: brand.name
+          // Get custom brand name from settings
+          const customBrandName = await SettingModel.getCustomBrandName(brand.name);
+          
+          console.log('✅ Brand Information:', {
+            originalBrand: brand.name,
+            customBrandName: customBrandName
           });
 
-          // Check if there's a custom brand mapping in settings
-          const customBrand = await SettingModel.getCustomBrandForListing(brand.name);
-          if (customBrand) {
-            console.log('🔄 Applying custom brand mapping:', {
-              originalBrand: brand.name,
-              customBrand: customBrand.name
-            });
-            brand = customBrand; // Use the custom brand instead
+          // If custom brand name is different, use it for the listing
+          if (customBrandName !== brand.name) {
+            // Check if custom brand exists, if not use brandName which will be handled by checkBrandExists
+            const customBrand = await ListingModel.checkBrandExists(customBrandName);
+            if (customBrand) {
+              brand = customBrand;
+              console.log('🔄 Using custom brand:', brand.name);
+            }
           }
-
-          console.log('✅ Final Brand Information:', {
-            brandId: brand.id,
-            brandName: brand.name
-          });
 
           // STEP 3: Check user access to brand (for non-admin users)
           if (req.user.role !== 'ADMIN') {

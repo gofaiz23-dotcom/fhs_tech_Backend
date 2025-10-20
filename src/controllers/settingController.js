@@ -83,53 +83,22 @@ class SettingController {
     }
   }
 
-  // API 3: Get all brands from Brand table with mappings
+  // API 3: Get all brands with mappings
   static async getBrands(req, res) {
     try {
-      // Auto-cleanup redundant mappings on every GET request
-      await SettingModel.cleanupRedundantMappings();
+      // Initialize brand mappings (adds any new brands from Brand table)
+      await SettingModel.initializeBrandMappings();
 
-      // Get all brands from Brand table
-      const allBrands = await SettingModel.getAllBrandsFromTable();
-
-      // Get current settings with brand mappings (after cleanup)
+      // Get current settings with all brand mappings
       const setting = await SettingModel.get();
       const ownBrandMappings = setting.ownBrand || {};
 
-      // Track which custom brands we've already processed
-      const processedCustomBrands = new Set();
-      
-      // Build list of unique brands (original + custom as 1 brand)
-      const brands = [];
-      
-      for (const brand of allBrands) {
-        // Check if this brand is in mappings as original
-        if (ownBrandMappings[brand.name]) {
-          // This is an original brand that has been mapped
-          const customBrand = ownBrandMappings[brand.name];
-          processedCustomBrands.add(customBrand);
-          
-          brands.push({
-            originalBrand: brand.name,
-            customBrand: customBrand,
-            isChanged: true
-          });
-        } 
-        // Check if this is a custom brand that we haven't processed yet
-        else if (!processedCustomBrands.has(brand.name)) {
-          // Check if this brand is a custom brand result (appears as value in mappings)
-          const isCustomBrandResult = Object.values(ownBrandMappings).includes(brand.name);
-          
-          if (!isCustomBrandResult) {
-            // This is a normal brand with no mapping
-            brands.push({
-              originalBrand: brand.name,
-              customBrand: brand.name,
-              isChanged: false
-            });
-          }
-        }
-      }
+      // Build response with all brands and their mappings
+      const brands = Object.entries(ownBrandMappings).map(([originalBrand, customBrand]) => ({
+        originalBrand: originalBrand,
+        customBrand: customBrand,
+        isChanged: originalBrand !== customBrand
+      }));
 
       res.json({
         message: 'Brands retrieved successfully',
@@ -146,7 +115,7 @@ class SettingController {
     }
   }
 
-  // API 4: Update brand name mappings and apply to all listings (Admin only)
+  // API 4: Update brand name mapping (Admin only)
   static async updateBrands(req, res) {
     try {
       const { originalBrand, customBrand } = req.body;
@@ -172,51 +141,22 @@ class SettingController {
       const currentSetting = await SettingModel.get();
       const currentMappings = currentSetting.ownBrand || {};
 
-      // If original = custom, delete the mapping (no need to store)
-      if (originalBrand === customBrand) {
-        // Remove from mappings
-        const updatedMappings = { ...currentMappings };
-        delete updatedMappings[originalBrand];
-
-        // Update settings
-        await SettingModel.updateOwnBrand(currentSetting.id, updatedMappings);
-
-        return res.json({
-          message: 'Brand mapping removed (original = custom)',
-          timestamp: new Date().toISOString(),
-          originalBrand: originalBrand,
-          customBrand: customBrand,
-          note: 'No mapping needed when original equals custom brand name'
-        });
-      }
-
-      // Add/Update the mapping only if different
+      // Update the mapping
       const updatedMappings = {
         ...currentMappings,
         [originalBrand]: customBrand
       };
 
-      // Clean up any mappings where original = custom
-      Object.keys(updatedMappings).forEach(key => {
-        if (key === updatedMappings[key]) {
-          delete updatedMappings[key];
-        }
-      });
-
-      // Update ownBrand mappings and automatically apply changes to all listings
+      // Update settings
       const updatedSetting = await SettingModel.updateOwnBrand(currentSetting.id, updatedMappings);
 
-      // Count how many listings were affected
-      const affectedCount = await SettingModel.countListingsByBrand(customBrand);
-
       res.json({
-        message: 'Brand mapping updated successfully and applied to all listings',
+        message: 'Brand mapping updated successfully',
         timestamp: new Date().toISOString(),
         originalBrand: originalBrand,
         customBrand: customBrand,
-        affectedListings: affectedCount,
         allMappings: updatedSetting.ownBrand,
-        note: `All listings with "${originalBrand}" have been changed to "${customBrand}"`
+        note: 'Future listings will use the custom brand name automatically'
       });
     } catch (error) {
       console.error('Update brand mappings error:', error);
