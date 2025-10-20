@@ -96,25 +96,46 @@ class SettingController {
       const setting = await SettingModel.get();
       const ownBrandMappings = setting.ownBrand || {};
 
-      // Build response showing only changed brands
-      const changedBrands = Object.entries(ownBrandMappings)
-        .filter(([originalBrand, customBrand]) => originalBrand !== customBrand)
-        .map(([originalBrand, customBrand]) => ({
-          originalBrand: originalBrand,
-          customBrand: customBrand,
-          isChanged: true
-        }));
-
-      // Also show all available brands that can be mapped
-      const availableBrands = allBrands.map(brand => brand.name);
+      // Track which custom brands we've already processed
+      const processedCustomBrands = new Set();
+      
+      // Build list of unique brands (original + custom as 1 brand)
+      const brands = [];
+      
+      for (const brand of allBrands) {
+        // Check if this brand is in mappings as original
+        if (ownBrandMappings[brand.name]) {
+          // This is an original brand that has been mapped
+          const customBrand = ownBrandMappings[brand.name];
+          processedCustomBrands.add(customBrand);
+          
+          brands.push({
+            originalBrand: brand.name,
+            customBrand: customBrand,
+            isChanged: true
+          });
+        } 
+        // Check if this is a custom brand that we haven't processed yet
+        else if (!processedCustomBrands.has(brand.name)) {
+          // Check if this brand is a custom brand result (appears as value in mappings)
+          const isCustomBrandResult = Object.values(ownBrandMappings).includes(brand.name);
+          
+          if (!isCustomBrandResult) {
+            // This is a normal brand with no mapping
+            brands.push({
+              originalBrand: brand.name,
+              customBrand: brand.name,
+              isChanged: false
+            });
+          }
+        }
+      }
 
       res.json({
         message: 'Brands retrieved successfully',
         timestamp: new Date().toISOString(),
-        totalAvailableBrands: availableBrands.length,
-        totalChangedBrands: changedBrands.length,
-        availableBrands: availableBrands,
-        changedBrands: changedBrands
+        totalBrands: brands.length,
+        brands: brands
       });
     } catch (error) {
       console.error('Get brands error:', error);
