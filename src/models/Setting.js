@@ -11,7 +11,8 @@ class SettingModel {
         data: {
           inventoryConfig: {
             minValue: 3
-          }
+          },
+          ownBrand: {}
         }
       });
     }
@@ -29,13 +30,166 @@ class SettingModel {
     });
   }
 
+  // Update own brand mappings and apply changes to listings
+  static async updateOwnBrand(settingId, ownBrand) {
+    // Update settings with new mappings
+    const updatedSetting = await prisma.setting.update({
+      where: { id: settingId },
+      data: {
+        ownBrand: ownBrand
+      }
+    });
+
+    // Apply brand name changes to all listings
+    for (const [originalBrandName, customBrandName] of Object.entries(ownBrand)) {
+      if (originalBrandName && customBrandName && originalBrandName !== customBrandName) {
+        await this.applyBrandNameChange(originalBrandName, customBrandName);
+      }
+    }
+
+    return updatedSetting;
+  }
+
+  // Apply brand name change to listings only
+  static async applyBrandNameChange(originalBrandName, customBrandName) {
+    // Find the brand by original name
+    const originalBrand = await prisma.brand.findFirst({
+      where: { name: { equals: originalBrandName, mode: 'insensitive' } }
+    });
+
+    if (!originalBrand) {
+      return; // Brand not found, skip
+    }
+
+    // Check if custom brand name already exists
+    let targetBrand = await prisma.brand.findFirst({
+      where: { name: { equals: customBrandName, mode: 'insensitive' } }
+    });
+
+    // If custom brand doesn't exist, create it
+    if (!targetBrand) {
+      targetBrand = await prisma.brand.create({
+        data: {
+          name: customBrandName,
+          description: `Mapped from ${originalBrandName}`
+        }
+      });
+    }
+
+    // Update ONLY listings with the original brand to use the new brand
+    await prisma.listing.updateMany({
+      where: { brandId: originalBrand.id },
+      data: { brandId: targetBrand.id }
+    });
+
+    // Don't touch products and inventory tables
+  }
+
+  // Get all unique brands from Listing table
+  static async getUniqueBrands() {
+    const brands = await prisma.listing.findMany({
+      select: {
+        brand: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      distinct: ['brandId']
+    });
+    
+    return brands.map(item => ({
+      id: item.brand.id,
+      name: item.brand.name
+    }));
+  }
+
+  // Count listings by brand name
+  static async countListingsByBrand(brandName) {
+    const brand = await prisma.brand.findFirst({
+      where: { name: { equals: brandName, mode: 'insensitive' } }
+    });
+
+    if (!brand) {
+      return 0;
+    }
+
+    return await prisma.listing.count({
+      where: { brandId: brand.id }
+    });
+  }
+
+  // Get custom brand mapping for a given brand (returns custom brand or original)
+  static async getCustomBrandForListing(originalBrandName) {
+    const setting = await this.get();
+    const ownBrand = setting.ownBrand || {};
+    
+    // Check if this brand has a custom mapping
+    const customBrandName = ownBrand[originalBrandName];
+    
+    if (customBrandName && customBrandName !== originalBrandName) {
+      // Find or create the custom brand
+      let customBrand = await prisma.brand.findFirst({
+        where: { name: { equals: customBrandName, mode: 'insensitive' } }
+      });
+
+      if (!customBrand) {
+        customBrand = await prisma.brand.create({
+          data: {
+            name: customBrandName,
+            description: `Mapped from ${originalBrandName}`
+          }
+        });
+      }
+
+      return customBrand;
+    }
+
+    // No custom mapping, return null (use original brand)
+    return null;
+  }
+
+  // Sync all brands from Brand table to settings (for initial setup)
+  static async syncBrandsToSettings() {
+    const setting = await this.get();
+    const currentMappings = setting.ownBrand || {};
+
+    // Get all brands from Brand table
+    const allBrands = await prisma.brand.findMany({
+      select: { name: true }
+    });
+
+    // Create default mappings (original = custom by default)
+    const defaultMappings = {};
+    allBrands.forEach(brand => {
+      // Only add if not already in settings
+      if (!currentMappings[brand.name]) {
+        defaultMappings[brand.name] = brand.name; // Default to original name
+      }
+    });
+
+    // Merge with existing mappings
+    const updatedMappings = {
+      ...defaultMappings,
+      ...currentMappings
+    };
+
+    // Update settings
+    return await prisma.setting.update({
+      where: { id: setting.id },
+      data: { ownBrand: updatedMappings }
+    });
+  }
+
   // Create default setting
   static async createDefault() {
     return await prisma.setting.create({
       data: {
         inventoryConfig: {
           minValue: 3
-        }
+        },
+        ownBrand: {}
       }
     });
   }

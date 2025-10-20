@@ -1,5 +1,6 @@
 import ListingModel from '../models/Listing.js';
 import InventoryModel from '../models/Inventory.js';
+import SettingModel from '../models/Setting.js';
 import { prisma } from '../config/database.js';
 import { processImage, processImages } from '../utils/imageDownloader.js';
 import jobTracker from '../services/jobTracker.js';
@@ -582,7 +583,22 @@ class ListingController {
             continue;
           }
 
-          console.log('✅ Brand Information:', {
+          console.log('✅ Brand Information (Original):', {
+            brandId: brand.id,
+            brandName: brand.name
+          });
+
+          // Check if there's a custom brand mapping in settings
+          const customBrand = await SettingModel.getCustomBrandForListing(brand.name);
+          if (customBrand) {
+            console.log('🔄 Applying custom brand mapping:', {
+              originalBrand: brand.name,
+              customBrand: customBrand.name
+            });
+            brand = customBrand; // Use the custom brand instead
+          }
+
+          console.log('✅ Final Brand Information:', {
             brandId: brand.id,
             brandName: brand.name
           });
