@@ -185,10 +185,7 @@ class ListingController {
 
         return {
           ...listing,
-          brand: listing.brand ? {
-            ...listing.brand,
-            displayName: displayBrandName  // Add custom brand name for display
-          } : listing.brand,
+          brand: displayBrandName,  // Show only custom brand name
           inventory: inventoryRecords,  // Inventory records in subSku order
           inventoryArray: inventoryArray,  // Quantities in SAME order as subSkus
           quantity: minQuantity,            // Min quantity (or direct if single)
