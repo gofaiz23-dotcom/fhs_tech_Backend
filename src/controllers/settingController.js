@@ -86,10 +86,13 @@ class SettingController {
   // API 3: Get all brands from Brand table with mappings
   static async getBrands(req, res) {
     try {
+      // Auto-cleanup redundant mappings on every GET request
+      await SettingModel.cleanupRedundantMappings();
+
       // Get all brands from Brand table
       const allBrands = await SettingModel.getAllBrandsFromTable();
 
-      // Get current settings with brand mappings
+      // Get current settings with brand mappings (after cleanup)
       const setting = await SettingModel.get();
       const ownBrandMappings = setting.ownBrand || {};
 
@@ -148,17 +151,39 @@ class SettingController {
       const currentSetting = await SettingModel.get();
       const currentMappings = currentSetting.ownBrand || {};
 
-      // Add/Update the mapping
+      // If original = custom, delete the mapping (no need to store)
+      if (originalBrand === customBrand) {
+        // Remove from mappings
+        const updatedMappings = { ...currentMappings };
+        delete updatedMappings[originalBrand];
+
+        // Update settings
+        await SettingModel.updateOwnBrand(currentSetting.id, updatedMappings);
+
+        return res.json({
+          message: 'Brand mapping removed (original = custom)',
+          timestamp: new Date().toISOString(),
+          originalBrand: originalBrand,
+          customBrand: customBrand,
+          note: 'No mapping needed when original equals custom brand name'
+        });
+      }
+
+      // Add/Update the mapping only if different
       const updatedMappings = {
         ...currentMappings,
         [originalBrand]: customBrand
       };
 
+      // Clean up any mappings where original = custom
+      Object.keys(updatedMappings).forEach(key => {
+        if (key === updatedMappings[key]) {
+          delete updatedMappings[key];
+        }
+      });
+
       // Update ownBrand mappings and automatically apply changes to all listings
       const updatedSetting = await SettingModel.updateOwnBrand(currentSetting.id, updatedMappings);
-
-      // Get updated brand list
-      const updatedBrands = await SettingModel.getUniqueBrands();
 
       // Count how many listings were affected
       const affectedCount = await SettingModel.countListingsByBrand(customBrand);

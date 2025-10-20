@@ -161,6 +161,26 @@ class SettingModel {
     });
   }
 
+  // Clean up redundant mappings (where original = custom)
+  static async cleanupRedundantMappings() {
+    const setting = await this.get();
+    const currentMappings = setting.ownBrand || {};
+
+    // Remove mappings where key === value
+    const cleanedMappings = {};
+    Object.entries(currentMappings).forEach(([original, custom]) => {
+      if (original !== custom) {
+        cleanedMappings[original] = custom;
+      }
+    });
+
+    // Update settings with cleaned mappings
+    return await prisma.setting.update({
+      where: { id: setting.id },
+      data: { ownBrand: cleanedMappings }
+    });
+  }
+
   // Create default setting
   static async createDefault() {
     return await prisma.setting.create({
