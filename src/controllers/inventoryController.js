@@ -364,10 +364,19 @@ class InventoryController {
           });
         }
 
+        // Security Check: User can only see their own jobs (unless admin)
+        if (job.userId !== req.user.userId && req.user.role !== 'ADMIN') {
+          return res.status(403).json({
+            error: 'Access denied',
+            message: 'You can only view your own jobs'
+          });
+        }
+
         return res.json({
           message: 'Job status retrieved successfully',
           job: {
             jobId: job.jobId,
+            userId: job.userId,
             type: job.type,
             status: job.status,
             progress: `${job.progress}%`,
@@ -386,12 +395,15 @@ class InventoryController {
         });
       }
 
-      // Get all inventory-related jobs for this user
-      const inventoryJobs = jobTracker.getJobsByType(req.user.userId, 'INVENTORY');
+      // Admin can see all jobs, users see only their own
+      const inventoryJobs = req.user.role === 'ADMIN'
+        ? jobTracker.getJobsByType(null, 'INVENTORY')  // Admin: all jobs
+        : jobTracker.getJobsByType(req.user.userId, 'INVENTORY'); // User: only their jobs
       
       // Format jobs for response
       const formattedJobs = inventoryJobs.map(job => ({
         jobId: job.jobId,
+        ...(req.user.role === 'ADMIN' && { userId: job.userId }), // Show userId for admin
         type: job.type,
         status: job.status,
         progress: `${job.progress}%`,
@@ -428,6 +440,69 @@ class InventoryController {
       console.error('Get inventory bulk status error:', error);
       res.status(500).json({
         error: 'Failed to get inventory bulk processing status',
+        details: error.message
+      });
+    }
+  }
+
+  // Cancel background job
+  static async cancelJob(req, res) {
+    try {
+      const { jobId } = req.params;
+
+      if (!jobId) {
+        return res.status(400).json({
+          error: 'Job ID is required',
+          message: 'Provide jobId in URL parameters'
+        });
+      }
+
+      const job = jobTracker.getJob(jobId);
+      if (!job) {
+        return res.status(404).json({
+          error: 'Job not found',
+          message: `Job ${jobId} does not exist`
+        });
+      }
+
+      // Security Check: User can only cancel their own jobs (unless admin)
+      if (job.userId !== req.user.userId && req.user.role !== 'ADMIN') {
+        return res.status(403).json({
+          error: 'Access denied',
+          message: 'You can only cancel your own jobs'
+        });
+      }
+
+      // Check if job can be cancelled
+      if (job.status !== 'PROCESSING') {
+        return res.status(400).json({
+          error: 'Cannot cancel job',
+          message: `Job is already ${job.status}. Only PROCESSING jobs can be cancelled.`
+        });
+      }
+
+      // Cancel the job
+      const cancelled = jobTracker.cancelJob(jobId, req.user.role === 'ADMIN' ? `admin (${req.user.userId})` : 'user');
+
+      if (cancelled) {
+        res.json({
+          message: 'Background job cancelled successfully',
+          jobId: jobId,
+          status: 'CANCELLED',
+          note: 'Processing will stop at current item. Already processed items remain in database.',
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        res.status(400).json({
+          error: 'Failed to cancel job',
+          message: 'Job cannot be cancelled at this time'
+        });
+      }
+
+    } catch (error) {
+      console.error('Cancel job error:', error);
+      res.status(500).json({
+        error: 'Failed to cancel background job',
         details: error.message
       });
     }

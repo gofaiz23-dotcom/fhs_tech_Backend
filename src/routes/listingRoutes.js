@@ -18,6 +18,7 @@ router.delete('/:id', validateId, ListingController.deleteListing);   // 5. Dele
 router.delete('/', requireAdmin, ListingController.deleteAllListings); // 6. Delete all listings (Admin only)
 router.put('/images', uploadSingleHybrid, handleUploadError, ListingController.bulkUploadListingImages); // 7. Upload listing images - Excel/JSON with image URLs - Unlimited with background processing
 router.get('/status', ListingController.getBulkStatus); // 8. Get bulk processing status (all background jobs for all listings)
+router.delete('/cancel/:jobId', ListingController.cancelJob); // 9. Cancel background job (user can cancel own, admin can cancel any)
 
 export default router;
 

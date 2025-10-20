@@ -92,10 +92,14 @@ class JobTracker {
   }
 
   // Get jobs by type (for specific status endpoints)
+  // If userId is null, returns all jobs (for admin)
   getJobsByType(userId, type) {
     const jobs = [];
     for (const job of this.jobs.values()) {
-      if (job.userId === userId && job.type.startsWith(type)) {
+      const matchesUser = userId === null || job.userId === userId;
+      const matchesType = job.type.startsWith(type);
+      
+      if (matchesUser && matchesType) {
         jobs.push(job);
       }
     }
@@ -135,6 +139,41 @@ class JobTracker {
     }
 
     return stats;
+  }
+
+  // Check if user has any active background job
+  hasActiveJob(userId) {
+    for (const job of this.jobs.values()) {
+      if (job.userId === userId && job.status === 'PROCESSING') {
+        return job; // Return the active job
+      }
+    }
+    return null;
+  }
+
+  // Cancel a job
+  cancelJob(jobId, cancelledBy = 'user') {
+    const job = this.jobs.get(jobId);
+    if (!job) return false;
+
+    // Can only cancel jobs that are still processing
+    if (job.status !== 'PROCESSING') {
+      return false;
+    }
+
+    job.status = 'CANCELLED';
+    job.completedAt = new Date();
+    job.data.cancelledBy = cancelledBy;
+    job.data.cancelReason = 'Cancelled by ' + cancelledBy;
+
+    this.jobs.set(jobId, job);
+    return true;
+  }
+
+  // Check if job is cancelled (for background worker to stop)
+  isCancelled(jobId) {
+    const job = this.jobs.get(jobId);
+    return job ? job.status === 'CANCELLED' : false;
   }
 }
 

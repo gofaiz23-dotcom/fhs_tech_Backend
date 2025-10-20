@@ -19,5 +19,6 @@ router.delete('/:id', validateId, ProductController.deleteProduct);  // 6. Delet
 router.delete('/', requireAdmin, ProductController.deleteAllProducts); // 7. Delete all products (Admin only)
 router.put('/images', uploadSingleHybrid, handleUploadError, ProductController.bulkUploadProductImages); // 8. Upload product images - Excel/JSON with image URLs - Unlimited with background processing
 router.get('/status', ProductController.getBulkStatus); // 9. Get bulk processing status (all background jobs for all products)
+router.delete('/cancel/:jobId', ProductController.cancelJob); // 10. Cancel background job (user can cancel own, admin can cancel any)
 
 export default router;

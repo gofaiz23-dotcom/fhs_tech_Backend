@@ -14,6 +14,7 @@ router.get('/', InventoryController.getInventory);                    // 1. Get 
 router.put('/:id', validateId, InventoryController.updateInventory);  // 2. Update inventory (quantity, ETA)
 router.post('/bulk/inventory/updates', uploadSingleHybrid, handleUploadError, InventoryController.bulkUpdateInventory); // 3. Bulk update inventory - Excel/CSV - Unlimited with background processing
 router.get('/status', InventoryController.getBulkStatus);   // 4. Get bulk inventory update status (all background jobs)
+router.delete('/cancel/:jobId', InventoryController.cancelJob); // 5. Cancel background job (user can cancel own, admin can cancel any)
 
 export default router;
 

@@ -826,17 +826,39 @@ class ProductController {
 
       // For large datasets, use background processing
       console.log('🚀 Large dataset detected, using background processing...');
-      const jobResult = await queueService.addBulkImageJob({
-        imageData: imageData,
-        userId: req.user.userId
-      }, req.user.userId);
+      
+      const jobId = await BackgroundProcessor.processBulk(
+        req.user.userId,
+        'PRODUCT_IMAGE',
+        imageData,
+        async (item) => {
+          const product = await ProductModel.findByGroupSku(item.groupSku);
+          if (!product) {
+            throw new Error(`Product not found: ${item.groupSku}`);
+          }
+
+          // Process images
+          const mainImage = item.mainImageUrl ? await processImage(item.mainImageUrl) : product.mainImageUrl;
+          const galleryImages = item.galleryImages && Array.isArray(item.galleryImages) 
+            ? await processImages(item.galleryImages)
+            : product.galleryImages;
+
+          // Update product
+          return await ProductModel.update(product.id, {
+            mainImageUrl: mainImage,
+            galleryImages: galleryImages
+          });
+        },
+        50 // Batch size
+      );
 
       res.status(202).json({
         message: `Large image dataset detected (${imageData.length} products). Processing in background.`,
-        jobId: jobResult.jobId,
-        status: jobResult.status,
+        jobId: jobId,
+        status: 'PROCESSING',
         totalProducts: imageData.length,
         estimatedTime: `${Math.ceil(imageData.length / 50)} minutes`,
+        checkStatus: `/api/products/status?jobId=${jobId}`,
         note: 'Use GET /api/products/status to check progress',
         timestamp: new Date().toISOString(),
         fileInfo: req.file ? {
@@ -1646,18 +1668,94 @@ class ProductController {
       }
 
       // For large datasets, use background processing
-      const jobResult = await queueService.addBulkProductJob({
-        fileData: productsToCreate,
-        fileInfo,
-        userRole: req.user.role
-      }, req.user.userId);
+      const jobId = await BackgroundProcessor.processCustom(
+        req.user.userId,
+        'PRODUCT_CREATE',
+        { total: productsToCreate.length },
+        async (jobId, tracker) => {
+          // Process products using same logic as createProduct
+          for (let i = 0; i < productsToCreate.length; i++) {
+            const productData = productsToCreate[i];
+            
+            try {
+              // Check brand
+              const brand = await ProductModel.checkBrandExists(productData.brandId || productData.brandName);
+              if (!brand) {
+                tracker.updateProgress(jobId, {
+                  processed: i + 1,
+                  failed: (tracker.getJob(jobId).data.failed || 0) + 1,
+                  errors: [...(tracker.getJob(jobId).data.errors || []), 
+                    { item: productData.title, error: `Brand not found: ${productData.brandId || productData.brandName}` }
+                  ].slice(-20)
+                });
+                continue;
+              }
+
+              // Check user access (if not admin)
+              if (req.user.role !== 'ADMIN') {
+                const hasAccess = await prisma.userBrandAccess.findFirst({
+                  where: { userId: req.user.userId, brandId: brand.id, isActive: true }
+                });
+                if (!hasAccess) {
+                  tracker.updateProgress(jobId, {
+                    processed: i + 1,
+                    failed: (tracker.getJob(jobId).data.failed || 0) + 1,
+                    errors: [...(tracker.getJob(jobId).data.errors || []), 
+                      { item: productData.title, error: `Access denied to brand: ${brand.name}` }
+                    ].slice(-20)
+                  });
+                  continue;
+                }
+              }
+
+              // Create product
+              const product = await ProductModel.create({
+                brandId: brand.id,
+                title: productData.title,
+                groupSku: productData.groupSku,
+                subSku: productData.subSku || productData.groupSku,
+                category: productData.category,
+                collectionName: productData.collectionName || '',
+                singleSetItem: productData.singleSetItem,
+                brandRealPrice: parseFloat(productData.brandRealPrice),
+                brandMiscellaneous: parseFloat(productData.brandMiscellaneous || 0),
+                brandPrice: parseFloat(productData.brandRealPrice) + parseFloat(productData.brandMiscellaneous || 0),
+                msrp: parseFloat(productData.msrp),
+                shippingPrice: parseFloat(productData.shippingPrice || 0),
+                commissionPrice: parseFloat(productData.commissionPrice || 0),
+                profitMarginPrice: parseFloat(productData.profitMarginPrice || 0),
+                ecommerceMiscellaneous: parseFloat(productData.ecommerceMiscellaneous || 0),
+                ecommercePrice: parseFloat(productData.ecommercePrice || 0),
+                mainImageUrl: productData.mainImageUrl ? await processImage(productData.mainImageUrl) : null,
+                galleryImages: productData.galleryImages ? await processImages(productData.galleryImages) : null,
+                attributes: productData.attributes || {}
+              });
+
+              tracker.updateProgress(jobId, {
+                processed: i + 1,
+                success: (tracker.getJob(jobId).data.success || 0) + 1
+              });
+
+            } catch (error) {
+              tracker.updateProgress(jobId, {
+                processed: i + 1,
+                failed: (tracker.getJob(jobId).data.failed || 0) + 1,
+                errors: [...(tracker.getJob(jobId).data.errors || []), 
+                  { item: productData.title, error: error.message }
+                ].slice(-20)
+              });
+            }
+          }
+        }
+      );
 
       res.status(202).json({
         message: `Large dataset detected (${productsToCreate.length} products). Processing in background.`,
-        jobId: jobResult.jobId,
-        status: jobResult.status,
+        jobId: jobId,
+        status: 'PROCESSING',
         totalProducts: productsToCreate.length,
         estimatedTime: `${Math.ceil(productsToCreate.length / 100)} minutes`,
+        checkStatus: `/api/products/status?jobId=${jobId}`,
         timestamp: new Date().toISOString()
       });
 
@@ -1685,10 +1783,19 @@ class ProductController {
           });
         }
 
+        // Security Check: User can only see their own jobs (unless admin)
+        if (job.userId !== req.user.userId && req.user.role !== 'ADMIN') {
+          return res.status(403).json({
+            error: 'Access denied',
+            message: 'You can only view your own jobs'
+          });
+        }
+
         return res.json({
           message: 'Job status retrieved successfully',
           job: {
             jobId: job.jobId,
+            userId: job.userId,
             type: job.type,
             status: job.status,
             progress: `${job.progress}%`,
@@ -1707,12 +1814,15 @@ class ProductController {
         });
       }
 
-      // Get all product-related jobs for this user
-      const productJobs = jobTracker.getJobsByType(req.user.userId, 'PRODUCT');
+      // Admin can see all jobs, users see only their own
+      const productJobs = req.user.role === 'ADMIN'
+        ? jobTracker.getJobsByType(null, 'PRODUCT')  // Admin: all jobs
+        : jobTracker.getJobsByType(req.user.userId, 'PRODUCT'); // User: only their jobs
       
       // Format jobs for response
       const formattedJobs = productJobs.map(job => ({
         jobId: job.jobId,
+        ...(req.user.role === 'ADMIN' && { userId: job.userId }), // Show userId for admin
         type: job.type,
         status: job.status,
         progress: `${job.progress}%`,
@@ -1754,6 +1864,69 @@ class ProductController {
     }
   }
 
+  // Cancel background job
+  static async cancelJob(req, res) {
+    try {
+      const { jobId } = req.params;
+
+      if (!jobId) {
+        return res.status(400).json({
+          error: 'Job ID is required',
+          message: 'Provide jobId in URL parameters'
+        });
+      }
+
+      const job = jobTracker.getJob(jobId);
+      if (!job) {
+        return res.status(404).json({
+          error: 'Job not found',
+          message: `Job ${jobId} does not exist`
+        });
+      }
+
+      // Security Check: User can only cancel their own jobs (unless admin)
+      if (job.userId !== req.user.userId && req.user.role !== 'ADMIN') {
+        return res.status(403).json({
+          error: 'Access denied',
+          message: 'You can only cancel your own jobs'
+        });
+      }
+
+      // Check if job can be cancelled
+      if (job.status !== 'PROCESSING') {
+        return res.status(400).json({
+          error: 'Cannot cancel job',
+          message: `Job is already ${job.status}. Only PROCESSING jobs can be cancelled.`
+        });
+      }
+
+      // Cancel the job
+      const cancelled = jobTracker.cancelJob(jobId, req.user.role === 'ADMIN' ? `admin (${req.user.userId})` : 'user');
+
+      if (cancelled) {
+        res.json({
+          message: 'Background job cancelled successfully',
+          jobId: jobId,
+          status: 'CANCELLED',
+          note: 'Processing will stop at current item. Already processed items remain in database.',
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        res.status(400).json({
+          error: 'Failed to cancel job',
+          message: 'Job cannot be cancelled at this time'
+        });
+      }
+
+    } catch (error) {
+      console.error('Cancel job error:', error);
+      res.status(500).json({
+        error: 'Failed to cancel background job',
+        details: error.message
+      });
+    }
+  }
+
   // Bulk image upload - Background processing (for large datasets)
   static async bulkUploadImages(req, res) {
     try {
@@ -1779,16 +1952,36 @@ class ProductController {
       }
 
       // For large datasets, use background processing
-      const jobResult = await queueService.addBulkImageJob({
-        imageData: validImageData
-      }, req.user.userId);
+      const jobId = await BackgroundProcessor.processBulk(
+        req.user.userId,
+        'PRODUCT_IMAGE',
+        validImageData,
+        async (item) => {
+          const product = await ProductModel.findById(parseInt(item.productId));
+          if (!product) {
+            throw new Error(`Product not found: ${item.productId}`);
+          }
+
+          // Process images (URLs or files)
+          const imageUrls = item.imageUrls || [];
+          const downloadedImages = await processImages(imageUrls);
+
+          // Update product
+          return await ProductModel.update(product.id, {
+            mainImageUrl: downloadedImages[0] || product.mainImageUrl,
+            galleryImages: downloadedImages.length > 1 ? downloadedImages.slice(1) : product.galleryImages
+          });
+        },
+        50 // Batch size
+      );
 
       res.status(202).json({
         message: `Large image dataset detected (${validImageData.length} products). Processing in background.`,
-        jobId: jobResult.jobId,
-        status: jobResult.status,
+        jobId: jobId,
+        status: 'PROCESSING',
         totalProducts: validImageData.length,
         estimatedTime: `${Math.ceil(validImageData.length / 50)} minutes`,
+        checkStatus: `/api/products/status?jobId=${jobId}`,
         timestamp: new Date().toISOString()
       });
 

@@ -5,6 +5,12 @@ class BackgroundProcessor {
   
   // Process bulk operation in background
   static async processBulk(userId, type, items, processFn, batchSize = 50) {
+    // Check if user already has an active background job
+    const activeJob = jobTracker.hasActiveJob(userId);
+    if (activeJob) {
+      throw new Error(`You already have an active background job (${activeJob.type}) running. Please wait for it to complete. Check status: ${activeJob.jobId}`);
+    }
+
     // Create job
     const jobId = jobTracker.createJob(userId, type, { total: items.length });
     
@@ -18,9 +24,21 @@ class BackgroundProcessor {
 
         // Process in batches
         for (let i = 0; i < items.length; i += batchSize) {
+          // Check if job was cancelled
+          if (jobTracker.isCancelled(jobId)) {
+            console.log(`🛑 Job ${jobId} cancelled by user`);
+            return; // Stop processing
+          }
+
           const batch = items.slice(i, i + batchSize);
           
           for (const item of batch) {
+            // Check cancellation before each item
+            if (jobTracker.isCancelled(jobId)) {
+              console.log(`🛑 Job ${jobId} cancelled by user`);
+              return; // Stop processing
+            }
+
             try {
               const result = await processFn(item);
               results.success.push(result);
@@ -63,6 +81,12 @@ class BackgroundProcessor {
 
   // Process with custom logic
   static async processCustom(userId, type, data, processFn) {
+    // Check if user already has an active background job
+    const activeJob = jobTracker.hasActiveJob(userId);
+    if (activeJob) {
+      throw new Error(`You already have an active background job (${activeJob.type}) running. Please wait for it to complete. Check status: ${activeJob.jobId}`);
+    }
+
     const jobId = jobTracker.createJob(userId, type, { total: data.total || 100 });
     
     setImmediate(async () => {
