@@ -86,30 +86,32 @@ class SettingController {
   // API 3: Get all brands from Brand table with mappings
   static async getBrands(req, res) {
     try {
-      // Sync brands from Brand table to Settings first
-      await SettingModel.syncBrandsToSettings();
+      // Get all brands from Brand table
+      const allBrands = await SettingModel.getAllBrandsFromTable();
 
-      // Get current settings with all brand mappings
+      // Get current settings with brand mappings
       const setting = await SettingModel.get();
       const ownBrandMappings = setting.ownBrand || {};
 
-      // Build response showing all brands with their mappings
-      const brandsWithMappings = Object.entries(ownBrandMappings).map(([originalBrand, customBrand]) => {
-        const isChanged = originalBrand !== customBrand;
-        
-        return {
+      // Build response showing only changed brands
+      const changedBrands = Object.entries(ownBrandMappings)
+        .filter(([originalBrand, customBrand]) => originalBrand !== customBrand)
+        .map(([originalBrand, customBrand]) => ({
           originalBrand: originalBrand,
           customBrand: customBrand,
-          isChanged: isChanged
-        };
-      });
+          isChanged: true
+        }));
+
+      // Also show all available brands that can be mapped
+      const availableBrands = allBrands.map(brand => brand.name);
 
       res.json({
         message: 'Brands retrieved successfully',
         timestamp: new Date().toISOString(),
-        totalBrands: brandsWithMappings.length,
-        brands: brandsWithMappings,
-        note: 'All brands from Brand table are automatically synced to settings'
+        totalAvailableBrands: availableBrands.length,
+        totalChangedBrands: changedBrands.length,
+        availableBrands: availableBrands,
+        changedBrands: changedBrands
       });
     } catch (error) {
       console.error('Get brands error:', error);

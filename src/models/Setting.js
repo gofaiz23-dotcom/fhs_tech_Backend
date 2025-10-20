@@ -150,35 +150,14 @@ class SettingModel {
     return null;
   }
 
-  // Sync all brands from Brand table to settings (for initial setup)
-  static async syncBrandsToSettings() {
-    const setting = await this.get();
-    const currentMappings = setting.ownBrand || {};
-
-    // Get all brands from Brand table
-    const allBrands = await prisma.brand.findMany({
-      select: { name: true }
-    });
-
-    // Create default mappings (original = custom by default)
-    const defaultMappings = {};
-    allBrands.forEach(brand => {
-      // Only add if not already in settings
-      if (!currentMappings[brand.name]) {
-        defaultMappings[brand.name] = brand.name; // Default to original name
-      }
-    });
-
-    // Merge with existing mappings
-    const updatedMappings = {
-      ...defaultMappings,
-      ...currentMappings
-    };
-
-    // Update settings
-    return await prisma.setting.update({
-      where: { id: setting.id },
-      data: { ownBrand: updatedMappings }
+  // Get all brands from Brand table (for display, no auto-sync)
+  static async getAllBrandsFromTable() {
+    return await prisma.brand.findMany({
+      select: { 
+        id: true,
+        name: true 
+      },
+      orderBy: { name: 'asc' }
     });
   }
 
