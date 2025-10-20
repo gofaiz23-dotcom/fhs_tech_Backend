@@ -13,7 +13,7 @@ router.put('/', requireAdmin, SettingController.updateSettings);  // 2. Update s
 
 // Brand name mapping routes
 router.get('/brands', SettingController.getBrands);       // 3. Get all brands from listings
-router.post('/brands', requireAdmin, SettingController.updateBrands);  // 4. Update brand mappings and apply to all listings (Admin only)
+router.put('/brands', requireAdmin, SettingController.updateBrands);  // 4. Update brand mappings and apply to all listings (Admin only)
 
 export default router;
 
