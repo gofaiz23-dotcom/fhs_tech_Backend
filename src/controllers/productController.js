@@ -107,8 +107,8 @@ class ProductController {
         userId: req.user.userId
       });
 
-      // Get base URL from environment (default: http://192.168.0.23:5000)
-      const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'http://192.168.0.23:5000';
+      // Get base URL from environment
+      const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL;
       
       // Filter base64 images and prepend base URL to local paths
       const cleanProducts = result.products.map(product => {
@@ -541,7 +541,7 @@ class ProductController {
           });
 
           // Add full URLs for response (prepend base URL)
-          const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'http://192.168.0.23:5000';
+          const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL;
           const productWithFullUrls = {
             ...product,
             mainImageUrl: product.mainImageUrl && product.mainImageUrl.startsWith('/uploads/') 
@@ -959,7 +959,7 @@ class ProductController {
       }
 
       // Get base URL for response
-      const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'http://192.168.0.23:5000';
+      const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL;
       
       // Prepend base URL to local paths
       const cleanResults = results.updated.map(item => ({
@@ -1298,7 +1298,7 @@ class ProductController {
       });
       
       // Get base URL from environment
-      const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'http://192.168.0.23:5000';
+      const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL;
       
       // Helper function to prepend base URL to local paths
       const prependBaseUrl = (imagePath) => {

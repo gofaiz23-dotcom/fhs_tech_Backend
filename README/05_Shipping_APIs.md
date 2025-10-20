@@ -1,6 +1,6 @@
 # Shipping Companies APIs Documentation
 
-Base URL: `http://192.168.0.23:5000/api`
+Base URL: `http://192.168.0.22:5000/api`
 
 ## 📋 Overview
 Complete CRUD operations for shipping company management with support for single company, multiple companies, and bulk file upload (CSV/Excel).
@@ -47,7 +47,7 @@ Complete CRUD operations for shipping company management with support for single
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/shipping \
+curl -X GET http://192.168.0.22:5000/api/shipping \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -99,7 +99,7 @@ curl -X GET http://192.168.0.23:5000/api/shipping \
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/shipping/1 \
+curl -X GET http://192.168.0.22:5000/api/shipping/1 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -236,7 +236,7 @@ Same structure as CSV with columns:
 
 **Single Shipping Company:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/shipping \
+curl -X POST http://192.168.0.22:5000/api/shipping \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -247,7 +247,7 @@ curl -X POST http://192.168.0.23:5000/api/shipping \
 
 **Multiple Shipping Companies:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/shipping \
+curl -X POST http://192.168.0.22:5000/api/shipping \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -260,7 +260,7 @@ curl -X POST http://192.168.0.23:5000/api/shipping \
 
 **File Upload:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/shipping \
+curl -X POST http://192.168.0.22:5000/api/shipping \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -F "file=@shipping_companies.csv"
 ```
@@ -315,7 +315,7 @@ curl -X POST http://192.168.0.23:5000/api/shipping \
 
 **cURL Example:**
 ```bash
-curl -X PUT http://192.168.0.23:5000/api/shipping/1 \
+curl -X PUT http://192.168.0.22:5000/api/shipping/1 \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -358,7 +358,7 @@ curl -X PUT http://192.168.0.23:5000/api/shipping/1 \
 
 **cURL Example:**
 ```bash
-curl -X DELETE http://192.168.0.23:5000/api/shipping/1 \
+curl -X DELETE http://192.168.0.22:5000/api/shipping/1 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -471,7 +471,7 @@ Malaysia Post,Malaysian postal service
 ```javascript
 // Get user's accessible shipping companies
 async function getShippingCompanies() {
-  const response = await fetch('http://192.168.0.23:5000/api/shipping', {
+  const response = await fetch('http://192.168.0.22:5000/api/shipping', {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }
@@ -481,7 +481,7 @@ async function getShippingCompanies() {
 
 // Create multiple shipping companies
 async function createShippingCompanies(companies) {
-  const response = await fetch('http://192.168.0.23:5000/api/shipping', {
+  const response = await fetch('http://192.168.0.22:5000/api/shipping', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -497,7 +497,7 @@ async function uploadShippingFile(file) {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await fetch('http://192.168.0.23:5000/api/shipping', {
+  const response = await fetch('http://192.168.0.22:5000/api/shipping', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`
@@ -509,7 +509,7 @@ async function uploadShippingFile(file) {
 
 // Update shipping company
 async function updateShippingCompany(id, data) {
-  const response = await fetch(`http://192.168.0.23:5000/api/shipping/${id}`, {
+  const response = await fetch(`http://192.168.0.22:5000/api/shipping/${id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -522,7 +522,7 @@ async function updateShippingCompany(id, data) {
 
 // Delete shipping company
 async function deleteShippingCompany(id) {
-  const response = await fetch(`http://192.168.0.23:5000/api/shipping/${id}`, {
+  const response = await fetch(`http://192.168.0.22:5000/api/shipping/${id}`, {
     method: 'DELETE',
     headers: {
       'Authorization': `Bearer ${accessToken}`

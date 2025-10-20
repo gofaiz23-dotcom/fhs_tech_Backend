@@ -1,6 +1,6 @@
 # Marketplaces APIs Documentation
 
-Base URL: `http://192.168.0.23:5000/api`
+Base URL: `http://192.168.0.22:5000/api`
 
 ## 📋 Overview
 Complete CRUD operations for marketplace management with support for single marketplace, multiple marketplaces, and bulk file upload (CSV/Excel).
@@ -47,7 +47,7 @@ Complete CRUD operations for marketplace management with support for single mark
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/marketplaces \
+curl -X GET http://192.168.0.22:5000/api/marketplaces \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -99,7 +99,7 @@ curl -X GET http://192.168.0.23:5000/api/marketplaces \
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/marketplaces/1 \
+curl -X GET http://192.168.0.22:5000/api/marketplaces/1 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -236,7 +236,7 @@ Same structure as CSV with columns:
 
 **Single Marketplace:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/marketplaces \
+curl -X POST http://192.168.0.22:5000/api/marketplaces \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -247,7 +247,7 @@ curl -X POST http://192.168.0.23:5000/api/marketplaces \
 
 **Multiple Marketplaces:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/marketplaces \
+curl -X POST http://192.168.0.22:5000/api/marketplaces \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -260,7 +260,7 @@ curl -X POST http://192.168.0.23:5000/api/marketplaces \
 
 **File Upload:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/marketplaces \
+curl -X POST http://192.168.0.22:5000/api/marketplaces \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -F "file=@marketplaces.csv"
 ```
@@ -315,7 +315,7 @@ curl -X POST http://192.168.0.23:5000/api/marketplaces \
 
 **cURL Example:**
 ```bash
-curl -X PUT http://192.168.0.23:5000/api/marketplaces/1 \
+curl -X PUT http://192.168.0.22:5000/api/marketplaces/1 \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -358,7 +358,7 @@ curl -X PUT http://192.168.0.23:5000/api/marketplaces/1 \
 
 **cURL Example:**
 ```bash
-curl -X DELETE http://192.168.0.23:5000/api/marketplaces/1 \
+curl -X DELETE http://192.168.0.22:5000/api/marketplaces/1 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -456,7 +456,7 @@ Newegg,American online retailer of computer hardware
 ```javascript
 // Get user's accessible marketplaces
 async function getMarketplaces() {
-  const response = await fetch('http://192.168.0.23:5000/api/marketplaces', {
+  const response = await fetch('http://192.168.0.22:5000/api/marketplaces', {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }
@@ -466,7 +466,7 @@ async function getMarketplaces() {
 
 // Create multiple marketplaces
 async function createMarketplaces(marketplaces) {
-  const response = await fetch('http://192.168.0.23:5000/api/marketplaces', {
+  const response = await fetch('http://192.168.0.22:5000/api/marketplaces', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -482,7 +482,7 @@ async function uploadMarketplaceFile(file) {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await fetch('http://192.168.0.23:5000/api/marketplaces', {
+  const response = await fetch('http://192.168.0.22:5000/api/marketplaces', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`

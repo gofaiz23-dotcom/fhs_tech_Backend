@@ -1,6 +1,6 @@
 # Admin APIs Documentation
 
-Base URL: `http://192.168.0.23:5000/api`
+Base URL: `http://192.168.0.22:5000/api`
 
 ## 📋 Overview
 Admin-only endpoints for user management, including viewing all users, updating user details, and managing user roles.
@@ -60,7 +60,7 @@ Admin-only endpoints for user management, including viewing all users, updating 
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/admin/users/basic \
+curl -X GET http://192.168.0.22:5000/api/admin/users/basic \
   -H "Authorization: Bearer <admin_access_token>" \
   -H "Content-Type: application/json"
 ```
@@ -136,7 +136,7 @@ curl -X GET http://192.168.0.23:5000/api/admin/users/basic \
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/admin/users/history \
+curl -X GET http://192.168.0.22:5000/api/admin/users/history \
   -H "Authorization: Bearer <admin_access_token>" \
   -H "Content-Type: application/json"
 ```
@@ -273,7 +273,7 @@ curl -X GET http://192.168.0.23:5000/api/admin/users/history \
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/admin/users/access \
+curl -X GET http://192.168.0.22:5000/api/admin/users/access \
   -H "Authorization: Bearer <admin_access_token>" \
   -H "Content-Type: application/json"
 ```
@@ -365,7 +365,7 @@ curl -X GET http://192.168.0.23:5000/api/admin/users/access \
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/admin/users/1 \
+curl -X GET http://192.168.0.22:5000/api/admin/users/1 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -418,7 +418,7 @@ curl -X GET http://192.168.0.23:5000/api/admin/users/1 \
 
 **cURL Example:**
 ```bash
-curl -X PUT http://192.168.0.23:5000/api/admin/users/1/email \
+curl -X PUT http://192.168.0.22:5000/api/admin/users/1/email \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -468,7 +468,7 @@ curl -X PUT http://192.168.0.23:5000/api/admin/users/1/email \
 
 **cURL Example:**
 ```bash
-curl -X PUT http://192.168.0.23:5000/api/admin/users/1/password \
+curl -X PUT http://192.168.0.22:5000/api/admin/users/1/password \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -525,7 +525,7 @@ curl -X PUT http://192.168.0.23:5000/api/admin/users/1/password \
 
 **cURL Example:**
 ```bash
-curl -X PUT http://192.168.0.23:5000/api/admin/users/1/role \
+curl -X PUT http://192.168.0.22:5000/api/admin/users/1/role \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{

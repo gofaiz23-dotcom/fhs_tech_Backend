@@ -1,6 +1,6 @@
 # Brands APIs Documentation
 
-Base URL: `http://192.168.0.23:5000/api`
+Base URL: `http://192.168.0.22:5000/api`
 
 ## 📋 Overview
 Complete CRUD operations for brand management with support for single brand, multiple brands, and bulk file upload (CSV/Excel).
@@ -47,7 +47,7 @@ Complete CRUD operations for brand management with support for single brand, mul
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/brands \
+curl -X GET http://192.168.0.22:5000/api/brands \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -99,7 +99,7 @@ curl -X GET http://192.168.0.23:5000/api/brands \
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/brands/1 \
+curl -X GET http://192.168.0.22:5000/api/brands/1 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -236,7 +236,7 @@ Same structure as CSV with columns:
 
 **Single Brand:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/brands \
+curl -X POST http://192.168.0.22:5000/api/brands \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -247,7 +247,7 @@ curl -X POST http://192.168.0.23:5000/api/brands \
 
 **Multiple Brands:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/brands \
+curl -X POST http://192.168.0.22:5000/api/brands \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -260,7 +260,7 @@ curl -X POST http://192.168.0.23:5000/api/brands \
 
 **File Upload:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/brands \
+curl -X POST http://192.168.0.22:5000/api/brands \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -F "file=@brands.csv"
 ```
@@ -315,7 +315,7 @@ curl -X POST http://192.168.0.23:5000/api/brands \
 
 **cURL Example:**
 ```bash
-curl -X PUT http://192.168.0.23:5000/api/brands/1 \
+curl -X PUT http://192.168.0.22:5000/api/brands/1 \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -358,7 +358,7 @@ curl -X PUT http://192.168.0.23:5000/api/brands/1 \
 
 **cURL Example:**
 ```bash
-curl -X DELETE http://192.168.0.23:5000/api/brands/1 \
+curl -X DELETE http://192.168.0.22:5000/api/brands/1 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 

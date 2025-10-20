@@ -1,6 +1,6 @@
 # Product Pricing APIs Documentation
 
-Base URL: `http://192.168.0.23:5000/api`
+Base URL: `http://192.168.0.22:5000/api`
 
 ## 📋 Overview
 Complete pricing management system for products with support for brand pricing, ecommerce pricing, bulk pricing updates, and comprehensive pricing calculations.
@@ -84,7 +84,7 @@ Complete pricing management system for products with support for brand pricing, 
 
 **cURL Example:**
 ```bash
-curl -X GET "http://192.168.0.23:5000/api/products/pricing?page=1&limit=20&brandId=1" \
+curl -X GET "http://192.168.0.22:5000/api/products/pricing?page=1&limit=20&brandId=1" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -196,7 +196,7 @@ curl -X GET "http://192.168.0.23:5000/api/products/pricing?page=1&limit=20&brand
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/products/pricing/1 \
+curl -X GET http://192.168.0.22:5000/api/products/pricing/1 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -302,7 +302,7 @@ curl -X GET http://192.168.0.23:5000/api/products/pricing/1 \
 
 **cURL Example:**
 ```bash
-curl -X PUT http://192.168.0.23:5000/api/products/pricing/1 \
+curl -X PUT http://192.168.0.22:5000/api/products/pricing/1 \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -423,7 +423,7 @@ curl -X PUT http://192.168.0.23:5000/api/products/pricing/1 \
 
 **cURL Example:**
 ```bash
-curl -X PUT http://192.168.0.23:5000/api/products/pricing/bulk \
+curl -X PUT http://192.168.0.22:5000/api/products/pricing/bulk \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -545,7 +545,7 @@ curl -X PUT http://192.168.0.23:5000/api/products/pricing/bulk \
 
 **cURL Example:**
 ```bash
-curl -X PUT http://192.168.0.23:5000/api/products/pricing/brand/1 \
+curl -X PUT http://192.168.0.22:5000/api/products/pricing/brand/1 \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -652,7 +652,7 @@ curl -X PUT http://192.168.0.23:5000/api/products/pricing/brand/1 \
 
 **cURL Example:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/products/pricing/calculate \
+curl -X POST http://192.168.0.22:5000/api/products/pricing/calculate \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -772,7 +772,7 @@ curl -X POST http://192.168.0.23:5000/api/products/pricing/calculate \
 
 **cURL Example:**
 ```bash
-curl -X GET "http://192.168.0.23:5000/api/products/pricing/analytics?brandId=1&dateRange=last30days" \
+curl -X GET "http://192.168.0.22:5000/api/products/pricing/analytics?brandId=1&dateRange=last30days" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -937,7 +937,7 @@ profitPercentage = (profitMargin / ecommercePrice) * 100
 ### Environment Setup
 ```json
 {
-  "base_url": "http://192.168.0.23:5000",
+  "base_url": "http://192.168.0.22:5000",
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "product_id": "1",
   "brand_id": "1"

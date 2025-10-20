@@ -1,6 +1,6 @@
 # Authentication APIs Documentation
 
-Base URL: `http://192.168.0.23:5000/api`
+Base URL: `http://192.168.0.22:5000/api`
 
 ## 📋 Overview
 Complete authentication system with JWT tokens, role-based access control, and login history tracking.
@@ -81,7 +81,7 @@ Complete authentication system with JWT tokens, role-based access control, and l
 
 **cURL Example:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/auth/register \
+curl -X POST http://192.168.0.22:5000/api/auth/register \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -139,7 +139,7 @@ curl -X POST http://192.168.0.23:5000/api/auth/register \
 
 **cURL Example:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/auth/login \
+curl -X POST http://192.168.0.22:5000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -184,7 +184,7 @@ curl -X POST http://192.168.0.23:5000/api/auth/login \
 
 **cURL Example:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/auth/refresh \
+curl -X POST http://192.168.0.22:5000/api/auth/refresh \
   -H "Content-Type: application/json" \
   --cookie "refreshToken=your_refresh_token_here"
 ```
@@ -216,7 +216,7 @@ curl -X POST http://192.168.0.23:5000/api/auth/refresh \
 
 **cURL Example:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/auth/logout \
+curl -X POST http://192.168.0.22:5000/api/auth/logout \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   --cookie "refreshToken=your_refresh_token_here"
@@ -260,7 +260,7 @@ curl -X POST http://192.168.0.23:5000/api/auth/logout \
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/auth/profile \
+curl -X GET http://192.168.0.22:5000/api/auth/profile \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -301,7 +301,7 @@ curl -X GET http://192.168.0.23:5000/api/auth/profile \
 ```javascript
 // Login function
 async function login(email, password) {
-  const response = await fetch('http://192.168.0.23:5000/api/auth/login', {
+  const response = await fetch('http://192.168.0.22:5000/api/auth/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'

@@ -74,13 +74,13 @@ This is a complete employee authentication and authorization system with:
 
 ### Base URL
 ```
-http://192.168.0.23:5000/api
+http://192.168.0.22:5000/api
 ```
 
 ### First Time Setup
 1. Register first admin (no token required):
 ```bash
-curl -X POST http://192.168.0.23:5000/api/auth/register \
+curl -X POST http://192.168.0.22:5000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "username": "admin_user",
@@ -92,7 +92,7 @@ curl -X POST http://192.168.0.23:5000/api/auth/register \
 
 2. Login to get access token:
 ```bash
-curl -X POST http://192.168.0.23:5000/api/auth/login \
+curl -X POST http://192.168.0.22:5000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@company.com",

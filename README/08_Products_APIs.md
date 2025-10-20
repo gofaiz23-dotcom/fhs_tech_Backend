@@ -1,6 +1,6 @@
 # Products APIs Documentation
 
-Base URL: `http://192.168.0.23:5000/api`
+Base URL: `http://192.168.0.22:5000/api`
 
 ## 📋 Overview
 Complete CRUD operations for product management with support for single product, multiple products, bulk file upload (CSV/Excel), image uploads, and advanced SKU handling with comma-separated values.
@@ -86,7 +86,7 @@ Complete CRUD operations for product management with support for single product,
 
 **cURL Example:**
 ```bash
-curl -X GET "http://192.168.0.23:5000/api/products?page=1&limit=20&brandId=1&category=Shoes" \
+curl -X GET "http://192.168.0.22:5000/api/products?page=1&limit=20&brandId=1&category=Shoes" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -171,7 +171,7 @@ curl -X GET "http://192.168.0.23:5000/api/products?page=1&limit=20&brandId=1&cat
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/products/sku/123ed \
+curl -X GET http://192.168.0.22:5000/api/products/sku/123ed \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -327,7 +327,7 @@ title,groupSku,subSku,category,collections,shipTypes,singleSetItem,brandId,brand
 
 **Single Product:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/products \
+curl -X POST http://192.168.0.22:5000/api/products \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -342,7 +342,7 @@ curl -X POST http://192.168.0.23:5000/api/products \
 
 **Multiple Products:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/products \
+curl -X POST http://192.168.0.22:5000/api/products \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -361,7 +361,7 @@ curl -X POST http://192.168.0.23:5000/api/products \
 
 **File Upload:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/products \
+curl -X POST http://192.168.0.22:5000/api/products \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -F "file=@products.csv"
 ```
@@ -453,7 +453,7 @@ curl -X POST http://192.168.0.23:5000/api/products \
 
 **cURL Example:**
 ```bash
-curl -X PUT http://192.168.0.23:5000/api/products/1 \
+curl -X PUT http://192.168.0.22:5000/api/products/1 \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -539,7 +539,7 @@ curl -X PUT http://192.168.0.23:5000/api/products/1 \
 
 **cURL Example:**
 ```bash
-curl -X DELETE http://192.168.0.23:5000/api/products/1 \
+curl -X DELETE http://192.168.0.22:5000/api/products/1 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -590,7 +590,7 @@ curl -X DELETE http://192.168.0.23:5000/api/products/1 \
 
 **cURL Example:**
 ```bash
-curl -X DELETE http://192.168.0.23:5000/api/products \
+curl -X DELETE http://192.168.0.22:5000/api/products \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -667,7 +667,7 @@ files: [Select multiple image files]
 
 **cURL Example (File Upload):**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/products/images \
+curl -X POST http://192.168.0.22:5000/api/products/images \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -F "groupSku=NIKE-AIRMAX-270" \
   -F "subSku=123ed" \
@@ -677,7 +677,7 @@ curl -X POST http://192.168.0.23:5000/api/products/images \
 
 **cURL Example (URL Download):**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/products/images \
+curl -X POST http://192.168.0.22:5000/api/products/images \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -875,7 +875,7 @@ Create these variables in your Postman environment:
 
 ```json
 {
-  "base_url": "http://192.168.0.23:5000",
+  "base_url": "http://192.168.0.22:5000",
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "admin_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."

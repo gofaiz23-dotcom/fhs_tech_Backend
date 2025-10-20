@@ -1,6 +1,6 @@
 # Login History & User Tracking Documentation
 
-Base URL: `http://192.168.0.23:5000/api`
+Base URL: `http://192.168.0.22:5000/api`
 
 ## 📋 Overview
 Comprehensive user activity tracking system that monitors login sessions, tracks work hours, and provides detailed analytics for admin oversight.
@@ -94,7 +94,7 @@ Comprehensive user activity tracking system that monitors login sessions, tracks
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/admin/users \
+curl -X GET http://192.168.0.22:5000/api/admin/users \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -191,7 +191,7 @@ curl -X GET http://192.168.0.23:5000/api/admin/users \
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/admin/users/1 \
+curl -X GET http://192.168.0.22:5000/api/admin/users/1 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -282,7 +282,7 @@ Captures browser and device information:
 ### 1. Employee Productivity Tracking
 ```bash
 # Get all employees with work hours
-curl -X GET http://192.168.0.23:5000/api/admin/users \
+curl -X GET http://192.168.0.22:5000/api/admin/users \
   -H "Authorization: Bearer <admin_token>"
 
 # Response shows:
@@ -294,7 +294,7 @@ curl -X GET http://192.168.0.23:5000/api/admin/users \
 ### 2. Security Monitoring
 ```bash
 # Check specific user's login patterns
-curl -X GET http://192.168.0.23:5000/api/admin/users/1 \
+curl -X GET http://192.168.0.22:5000/api/admin/users/1 \
   -H "Authorization: Bearer <admin_token>"
 
 # Look for:

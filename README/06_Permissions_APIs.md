@@ -1,6 +1,6 @@
 # Permissions APIs Documentation
 
-Base URL: `http://192.168.0.23:5000/api`
+Base URL: `http://192.168.0.22:5000/api`
 
 ## 📋 Overview
 Permission management system for controlling user access to brands, marketplaces, and shipping companies. Only admins can manage permissions.
@@ -52,7 +52,7 @@ Permission management system for controlling user access to brands, marketplaces
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/users/1/brands \
+curl -X GET http://192.168.0.22:5000/api/users/1/brands \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -111,7 +111,7 @@ curl -X GET http://192.168.0.23:5000/api/users/1/brands \
 
 **cURL Example:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/users/1/brands \
+curl -X POST http://192.168.0.22:5000/api/users/1/brands \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -153,7 +153,7 @@ curl -X POST http://192.168.0.23:5000/api/users/1/brands \
 
 **cURL Example:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/users/1/brands/1/toggle \
+curl -X POST http://192.168.0.22:5000/api/users/1/brands/1/toggle \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -202,7 +202,7 @@ curl -X POST http://192.168.0.23:5000/api/users/1/brands/1/toggle \
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/users/1/marketplaces \
+curl -X GET http://192.168.0.22:5000/api/users/1/marketplaces \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -247,7 +247,7 @@ curl -X GET http://192.168.0.23:5000/api/users/1/marketplaces \
 
 **cURL Example:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/users/1/marketplaces \
+curl -X POST http://192.168.0.22:5000/api/users/1/marketplaces \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -289,7 +289,7 @@ curl -X POST http://192.168.0.23:5000/api/users/1/marketplaces \
 
 **cURL Example:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/users/1/marketplaces/1/toggle \
+curl -X POST http://192.168.0.22:5000/api/users/1/marketplaces/1/toggle \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -338,7 +338,7 @@ curl -X POST http://192.168.0.23:5000/api/users/1/marketplaces/1/toggle \
 
 **cURL Example:**
 ```bash
-curl -X GET http://192.168.0.23:5000/api/users/1/shipping \
+curl -X GET http://192.168.0.22:5000/api/users/1/shipping \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -383,7 +383,7 @@ curl -X GET http://192.168.0.23:5000/api/users/1/shipping \
 
 **cURL Example:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/users/1/shipping \
+curl -X POST http://192.168.0.22:5000/api/users/1/shipping \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
@@ -425,7 +425,7 @@ curl -X POST http://192.168.0.23:5000/api/users/1/shipping \
 
 **cURL Example:**
 ```bash
-curl -X POST http://192.168.0.23:5000/api/users/1/shipping/1/toggle \
+curl -X POST http://192.168.0.22:5000/api/users/1/shipping/1/toggle \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -463,25 +463,25 @@ curl -X POST http://192.168.0.23:5000/api/users/1/shipping/1/toggle \
 ### Scenario 1: New Employee Onboarding
 ```bash
 # 1. Admin creates user
-curl -X POST http://192.168.0.23:5000/api/auth/register \
+curl -X POST http://192.168.0.22:5000/api/auth/register \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <admin_token>" \
   -d '{"email": "employee@company.com", "password": "temp123", "role": "USER"}'
 
 # 2. Grant brand access
-curl -X POST http://192.168.0.23:5000/api/users/1/brands \
+curl -X POST http://192.168.0.22:5000/api/users/1/brands \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <admin_token>" \
   -d '{"brandId": 1}'
 
 # 3. Grant marketplace access
-curl -X POST http://192.168.0.23:5000/api/users/1/marketplaces \
+curl -X POST http://192.168.0.22:5000/api/users/1/marketplaces \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <admin_token>" \
   -d '{"marketplaceId": 1}'
 
 # 4. Grant shipping access
-curl -X POST http://192.168.0.23:5000/api/users/1/shipping \
+curl -X POST http://192.168.0.22:5000/api/users/1/shipping \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <admin_token>" \
   -d '{"shippingCompanyId": 1}'
@@ -490,22 +490,22 @@ curl -X POST http://192.168.0.23:5000/api/users/1/shipping \
 ### Scenario 2: Temporary Access Suspension
 ```bash
 # Disable brand access (without deleting permission)
-curl -X POST http://192.168.0.23:5000/api/users/1/brands/1/toggle \
+curl -X POST http://192.168.0.22:5000/api/users/1/brands/1/toggle \
   -H "Authorization: Bearer <admin_token>"
 
 # Later, re-enable access
-curl -X POST http://192.168.0.23:5000/api/users/1/brands/1/toggle \
+curl -X POST http://192.168.0.22:5000/api/users/1/brands/1/toggle \
   -H "Authorization: Bearer <admin_token>"
 ```
 
 ### Scenario 3: Role Change
 ```bash
 # Check current permissions
-curl -X GET http://192.168.0.23:5000/api/users/1/brands \
+curl -X GET http://192.168.0.22:5000/api/users/1/brands \
   -H "Authorization: Bearer <admin_token>"
 
 # Promote to admin (gets access to everything)
-curl -X PUT http://192.168.0.23:5000/api/admin/users/1/role \
+curl -X PUT http://192.168.0.22:5000/api/admin/users/1/role \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <admin_token>" \
   -d '{"role": "ADMIN"}'
@@ -536,7 +536,7 @@ curl -X PUT http://192.168.0.23:5000/api/admin/users/1/role \
 class PermissionManager {
   constructor(accessToken) {
     this.accessToken = accessToken;
-    this.baseUrl = 'http://192.168.0.23:5000/api';
+    this.baseUrl = 'http://192.168.0.22:5000/api';
   }
 
   // Get user's brand permissions
