@@ -238,7 +238,7 @@ model Product {
 model Listing {
   id          Int      @id @default(autoincrement())
   productId   Int      @map("product_id")  // Reference to Product - For validation only
-  brandId     Int      @map("brand_id")
+  brandId     Int      @map("brand_id")  // For access control and display
   title       String
   sku         String   @map("group_sku")  // Required - cannot be null
   subSku      String?  @map("sub_sku")  // Must exist in product's subSku field

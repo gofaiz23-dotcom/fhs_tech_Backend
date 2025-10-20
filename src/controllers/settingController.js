@@ -86,18 +86,18 @@ class SettingController {
   // API 3: Get all brands with mappings
   static async getBrands(req, res) {
     try {
-      // Initialize brand mappings (adds any new brands from Brand table)
-      await SettingModel.initializeBrandMappings();
-
       // Get current settings with all brand mappings
       const setting = await SettingModel.get();
       const ownBrandMappings = setting.ownBrand || {};
 
-      // Build response with all brands and their mappings
-      const brands = Object.entries(ownBrandMappings).map(([originalBrand, customBrand]) => ({
-        originalBrand: originalBrand,
-        customBrand: customBrand,
-        isChanged: originalBrand !== customBrand
+      // Get all brands from Brand table
+      const allBrands = await SettingModel.getAllBrandsFromTable();
+
+      // Build response - show all brands from Brand table with their mappings
+      const brands = allBrands.map(brand => ({
+        originalBrand: brand.name,
+        customBrand: ownBrandMappings[brand.name] || brand.name,
+        isChanged: ownBrandMappings[brand.name] && ownBrandMappings[brand.name] !== brand.name
       }));
 
       res.json({
@@ -147,8 +147,11 @@ class SettingController {
         [originalBrand]: customBrand
       };
 
-      // Update settings
-      const updatedSetting = await SettingModel.updateOwnBrand(currentSetting.id, updatedMappings);
+      // Update settings (brand mapping applied at display time via business logic)
+      const updatedSetting = await SettingModel.updateOwnBrand(
+        currentSetting.id, 
+        updatedMappings
+      );
 
       res.json({
         message: 'Brand mapping updated successfully',
@@ -156,7 +159,7 @@ class SettingController {
         originalBrand: originalBrand,
         customBrand: customBrand,
         allMappings: updatedSetting.ownBrand,
-        note: 'Future listings will use the custom brand name automatically'
+        note: `All listings with "${originalBrand}" will now display as "${customBrand}"`
       });
     } catch (error) {
       console.error('Update brand mappings error:', error);

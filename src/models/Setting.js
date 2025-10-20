@@ -40,15 +40,6 @@ class SettingModel {
     });
   }
 
-  // Get custom brand name from settings (returns custom name or original)
-  static async getCustomBrandName(originalBrandName) {
-    const setting = await this.get();
-    const ownBrand = setting.ownBrand || {};
-    
-    // Return custom brand name if exists, otherwise return original
-    return ownBrand[originalBrandName] || originalBrandName;
-  }
-
   // Get all brands from Brand table (for display, no auto-sync)
   static async getAllBrandsFromTable() {
     return await prisma.brand.findMany({

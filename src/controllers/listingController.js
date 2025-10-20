@@ -111,6 +111,9 @@ class ListingController {
 
       const result = await ListingModel.findAll(req.user.userId, req.user.role, page, limit, filters);
 
+      // Get brand mappings from settings for display
+      const ownBrandMappings = settings.ownBrand || {};
+
       // Fetch inventory for each listing by matching subSkus (since inventory is now globally unique)
       const listingsWithInventoryStats = await Promise.all(result.listings.map(async (listing) => {
         const inventoryArray = [];
@@ -176,8 +179,16 @@ class ListingController {
           status = 'Out of Stock';  // Less than min
         }
         
+        // Apply brand mapping from settings (business logic)
+        const originalBrandName = listing.brand?.name;
+        const displayBrandName = originalBrandName ? (ownBrandMappings[originalBrandName] || originalBrandName) : originalBrandName;
+
         return {
           ...listing,
+          brand: listing.brand ? {
+            ...listing.brand,
+            displayName: displayBrandName  // Add custom brand name for display
+          } : listing.brand,
           inventory: inventoryRecords,  // Inventory records in subSku order
           inventoryArray: inventoryArray,  // Quantities in SAME order as subSkus
           quantity: minQuantity,            // Min quantity (or direct if single)
@@ -583,23 +594,10 @@ class ListingController {
             continue;
           }
 
-          // Get custom brand name from settings
-          const customBrandName = await SettingModel.getCustomBrandName(brand.name);
-          
           console.log('✅ Brand Information:', {
-            originalBrand: brand.name,
-            customBrandName: customBrandName
+            brandId: brand.id,
+            brandName: brand.name
           });
-
-          // If custom brand name is different, use it for the listing
-          if (customBrandName !== brand.name) {
-            // Check if custom brand exists, if not use brandName which will be handled by checkBrandExists
-            const customBrand = await ListingModel.checkBrandExists(customBrandName);
-            if (customBrand) {
-              brand = customBrand;
-              console.log('🔄 Using custom brand:', brand.name);
-            }
-          }
 
           // STEP 3: Check user access to brand (for non-admin users)
           if (req.user.role !== 'ADMIN') {
@@ -722,7 +720,7 @@ class ListingController {
 
           const listing = await ListingModel.create({
             productId: product.id,  // Link to product (for validation only)
-            brandId: brand.id,
+            brandId: brand.id,  // For access control and display
             title: listingData.title,
             sku: listingData.sku, // sku field required (case-insensitive: sku, SKU, sKU all work)
             subSku: listingData.subSku,
