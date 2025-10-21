@@ -770,7 +770,7 @@ class ProductController {
         }
 
         // Transform Excel data to imageData format
-        // Expected columns: groupSku, mainImageUrl, galleryImages (comma-separated URLs)
+        // Expected columns: groupSku, subSku (optional), mainImageUrl, galleryImages (comma-separated URLs)
         imageData = fileData.map(row => {
           const galleryImagesStr = ProductController.getFieldValue(row, 'galleryImages');
           let galleryImagesArray = [];
@@ -786,6 +786,7 @@ class ProductController {
           
           return {
             groupSku: ProductController.getFieldValue(row, 'groupSku'),
+            subSku: ProductController.getFieldValue(row, 'subSku'), // Optional subSku column
             mainImageUrl: ProductController.getFieldValue(row, 'mainImageUrl'),
             galleryImages: galleryImagesArray
           };
@@ -804,7 +805,7 @@ class ProductController {
           error: 'Invalid request format',
           message: 'Provide either an Excel/CSV file or JSON imageData array',
           examples: {
-            excelUpload: 'Upload Excel with columns: groupSku, mainImageUrl, galleryImages',
+            excelUpload: 'Upload Excel with columns: groupSku, subSku (optional), mainImageUrl, galleryImages',
             jsonUpload: '{ "imageData": [{ "groupSku": "SKU-001", "mainImageUrl": "url", "galleryImages": ["url1", "url2"] }] }'
           }
         });
@@ -837,11 +838,15 @@ class ProductController {
             throw new Error(`Product not found: ${item.groupSku}`);
           }
 
-          // Process images
+          // Process images (override, not append)
           const mainImage = item.mainImageUrl ? await processImage(item.mainImageUrl) : product.mainImageUrl;
-          const galleryImages = item.galleryImages && Array.isArray(item.galleryImages) 
-            ? await processImages(item.galleryImages)
-            : product.galleryImages;
+          let galleryImages = product.galleryImages;
+          
+          if (item.galleryImages && Array.isArray(item.galleryImages)) {
+            const downloadedGallery = await processImages(item.galleryImages);
+            // Override existing gallery images (keep duplicates for subSku correspondence)
+            galleryImages = downloadedGallery;
+          }
 
           // Update product
           return await ProductModel.update(product.id, {
@@ -931,7 +936,8 @@ class ProductController {
 
           if (item.galleryImages && Array.isArray(item.galleryImages) && item.galleryImages.length > 0) {
             const downloadedGallery = await processImages(item.galleryImages);
-            finalGalleryImages = [...finalGalleryImages, ...downloadedGallery];
+            // Override (replace) existing gallery images (keep duplicates for subSku correspondence)
+            finalGalleryImages = downloadedGallery;
           }
 
           // Update product with new images

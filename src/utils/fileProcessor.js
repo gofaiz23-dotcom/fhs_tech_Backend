@@ -25,7 +25,6 @@ class FileProcessor {
       'group_sk_u': 'groupSku',
       'groupsku': 'groupSku',
       'group': 'groupSku',
-      'sku': 'groupSku',
       'product_sku': 'groupSku',
       'productsku': 'groupSku',
       'Group SKU': 'groupSku',

@@ -1144,9 +1144,13 @@ class ListingController {
         }
 
         // Transform Excel data to imageData format
-        // Expected columns: sku, mainImageUrl, galleryImages (comma-separated URLs)
+        // Expected columns: sku, subSku (optional), mainImageUrl, galleryImages (comma-separated URLs)
         imageData = fileData.map(row => {
+          const sku = ListingController.getFieldValue(row, 'sku');
+          const subSku = ListingController.getFieldValue(row, 'subSku');
+          const mainImageUrl = ListingController.getFieldValue(row, 'mainImageUrl');
           const galleryImagesStr = ListingController.getFieldValue(row, 'galleryImages');
+          
           let galleryImagesArray = [];
           
           if (galleryImagesStr) {
@@ -1159,8 +1163,9 @@ class ListingController {
           }
           
           return {
-            sku: ListingController.getFieldValue(row, 'sku'),
-            mainImageUrl: ListingController.getFieldValue(row, 'mainImageUrl'),
+            sku,
+            subSku, // Optional subSku column
+            mainImageUrl,
             galleryImages: galleryImagesArray
           };
         }).filter(item => item.sku); // Only include rows with sku
@@ -1178,7 +1183,7 @@ class ListingController {
           error: 'Invalid request format',
           message: 'Provide either an Excel/CSV file or JSON imageData array',
           examples: {
-            excelUpload: 'Upload Excel with columns: sku, mainImageUrl, galleryImages',
+            excelUpload: 'Upload Excel with columns: sku, subSku (optional), mainImageUrl, galleryImages',
             jsonUpload: '{ "imageData": [{ "sku": "SKU-001", "mainImageUrl": "url", "galleryImages": ["url1", "url2"] }] }'
           }
         });
@@ -1211,11 +1216,15 @@ class ListingController {
             throw new Error(`Listing not found: ${item.sku}`);
           }
 
-          // Process images
+          // Process images (override, not append)
           const mainImage = item.mainImageUrl ? await processImage(item.mainImageUrl) : listing.mainImageUrl;
-          const galleryImages = item.galleryImages && Array.isArray(item.galleryImages) 
-            ? await processImages(item.galleryImages)
-            : listing.galleryImages;
+          let galleryImages = listing.galleryImages;
+          
+          if (item.galleryImages && Array.isArray(item.galleryImages)) {
+            const downloadedGallery = await processImages(item.galleryImages);
+            // Override existing gallery images (keep duplicates for subSku correspondence)
+            galleryImages = downloadedGallery;
+          }
 
           // Update listing
           return await ListingModel.update(listing.id, {
@@ -1305,7 +1314,8 @@ class ListingController {
 
           if (item.galleryImages && Array.isArray(item.galleryImages) && item.galleryImages.length > 0) {
             const downloadedGallery = await processImages(item.galleryImages);
-            finalGalleryImages = [...finalGalleryImages, ...downloadedGallery];
+            // Override (replace) existing gallery images (keep duplicates for subSku correspondence)
+            finalGalleryImages = downloadedGallery;
           }
 
           // Update listing with new images
