@@ -111,7 +111,8 @@ class ProductController {
       const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL;
       
       // Filter base64 images and prepend base URL to local paths
-      const cleanProducts = result.products.map(product => {
+      const cleanProducts = [];
+      for (const product of result.products) {
         const cleanedProduct = { ...product };
         
         // Process mainImageUrl
@@ -146,8 +147,95 @@ class ProductController {
           }
         }
         
-        return cleanedProduct;
-      });
+        // Process subSKU data for products with multiple subSKUs
+        if (cleanedProduct.subSku && cleanedProduct.subSku.includes(',')) {
+          const subSkus = cleanedProduct.subSku.split(',').map(s => s.trim()).filter(s => s);
+          if (subSkus.length > 1) {
+            // Check if subSkuData already exists and has correct mapping
+            if (cleanedProduct.attributes && cleanedProduct.attributes.subSkuData) {
+              // Check if name field is using subCategory (correct mapping)
+              const firstSubSku = Object.keys(cleanedProduct.attributes.subSkuData)[0];
+              const hasCorrectMapping = firstSubSku && 
+                cleanedProduct.attributes.subSkuData[firstSubSku].name === cleanedProduct.attributes.subCategory;
+              
+              if (hasCorrectMapping) {
+                // Process existing subSKU data images
+                Object.keys(cleanedProduct.attributes.subSkuData).forEach(subSku => {
+                  const subSkuData = cleanedProduct.attributes.subSkuData[subSku];
+                  
+                  // Process main image for this subSKU
+                  if (subSkuData.mainImageUrl) {
+                    if (subSkuData.mainImageUrl.startsWith('/uploads/')) {
+                      let imagePath = subSkuData.mainImageUrl.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                      subSkuData.mainImageUrl = `${IMAGE_BASE_URL}${imagePath}`;
+                    }
+                  }
+                  
+                  // Process gallery images for this subSKU
+                  if (Array.isArray(subSkuData.galleryImages)) {
+                    subSkuData.galleryImages = subSkuData.galleryImages
+                      .filter(img => img && !img.startsWith('data:image/'))
+                      .map(img => {
+                        if (img.startsWith('/uploads/')) {
+                          let imagePath = img.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                          return `${IMAGE_BASE_URL}${imagePath}`;
+                        }
+                        return img;
+                      });
+                  }
+                });
+              } else {
+                // Regenerate subSkuData with correct mapping
+                cleanedProduct.attributes.subSkuData = {};
+                
+                // Get individual subSKU prices from related products - only include existing subSKUs
+                for (const subSku of subSkus) {
+                  const relatedProduct = await prisma.product.findFirst({
+                    where: { subSku: subSku }
+                  });
+                  
+                  // Only add to subSkuData if the individual product exists
+                  if (relatedProduct) {
+                    cleanedProduct.attributes.subSkuData[subSku] = {
+                      name: `${cleanedProduct.attributes.subCategory || 'Unknown'}-${subSku}`,
+                      brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
+                      mainImageUrl: cleanedProduct.mainImageUrl,
+                      galleryImages: cleanedProduct.galleryImages || []
+                    };
+                  }
+                }
+                
+                console.log('✅ Regenerated subSkuData with correct mapping:', cleanedProduct.attributes.subSkuData);
+              }
+            } else {
+              // Generate subSkuData for existing products with multiple subSKUs
+              cleanedProduct.attributes = cleanedProduct.attributes || {};
+              cleanedProduct.attributes.subSkuData = {};
+              
+              // Get individual subSKU prices from related products - only include existing subSKUs
+              for (const subSku of subSkus) {
+                const relatedProduct = await prisma.product.findFirst({
+                  where: { subSku: subSku }
+                });
+                
+                // Only add to subSkuData if the individual product exists
+                if (relatedProduct) {
+                  cleanedProduct.attributes.subSkuData[subSku] = {
+                    name: `${cleanedProduct.attributes.subCategory || 'Unknown'}-${subSku}`,
+                    brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
+                    mainImageUrl: cleanedProduct.mainImageUrl,
+                    galleryImages: cleanedProduct.galleryImages || []
+                  };
+                }
+              }
+              
+              console.log('✅ Generated subSkuData for existing product with multiple subSKUs:', cleanedProduct.attributes.subSkuData);
+            }
+          }
+        }
+        
+        cleanProducts.push(cleanedProduct);
+      }
 
       res.json({
         message: 'Products retrieved successfully',
@@ -460,6 +548,59 @@ class ProductController {
           // Process attributes (clean up empty values)
           console.log('🔧 Processing attributes...');
           let finalAttributes = { ...productData.attributes };
+          
+          // Process subSKU data if multiple subSKUs exist
+          if (productData.subSku && productData.subSku.includes(',')) {
+            const subSkus = productData.subSku.split(',').map(s => s.trim()).filter(s => s);
+            if (subSkus.length > 1) {
+              // Validate ALL subSKUs exist as individual products
+              const missingSubSkus = [];
+              const existingSubSkus = [];
+              
+              for (const subSku of subSkus) {
+                const relatedProduct = await prisma.product.findFirst({
+                  where: { subSku: subSku }
+                });
+                
+                if (relatedProduct) {
+                  existingSubSkus.push(subSku);
+                } else {
+                  missingSubSkus.push(subSku);
+                }
+              }
+              
+              // If any subSKUs are missing, reject the product creation
+              if (missingSubSkus.length > 0) {
+                return res.status(400).json({
+                  error: 'Product creation failed',
+                  message: `Cannot create product with multiple subSKUs. Missing individual products for: ${missingSubSkus.join(', ')}`,
+                  details: {
+                    missingSubSkus: missingSubSkus,
+                    existingSubSkus: existingSubSkus,
+                    suggestion: 'Please create individual products for all subSKUs first, then create the multi-subSKU product.'
+                  }
+                });
+              }
+              
+              // All subSKUs exist - proceed with subSkuData creation
+              finalAttributes.subSkuData = {};
+              
+              for (const subSku of subSkus) {
+                const relatedProduct = await prisma.product.findFirst({
+                  where: { subSku: subSku }
+                });
+                
+                finalAttributes.subSkuData[subSku] = {
+                  name: `${productData.attributes?.subCategory || 'Unknown'}-${subSku}`,
+                  brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
+                  mainImageUrl: productData.mainImageUrl || null,
+                  galleryImages: productData.galleryImages || []
+                };
+              }
+              
+              console.log('✅ Multiple subSKUs detected in product, all validated and stored in attributes:', finalAttributes.subSkuData);
+            }
+          }
           
           // Filter out empty/null values from attributes
           Object.keys(finalAttributes).forEach(key => {
