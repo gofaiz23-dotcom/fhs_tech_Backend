@@ -163,8 +163,15 @@ class ListingController {
         let productSubSkuData = null;
         if (listing.subSku && listing.subSku.includes(',')) {
           const subSkus = listing.subSku.split(',').map(s => s.trim()).filter(s => s);
-          if (subSkus.length > 1 && listing.product && listing.product.attributes && listing.product.attributes.subSkuData) {
-            productSubSkuData = listing.product.attributes.subSkuData;
+          if (subSkus.length > 1) {
+            // First check if listing has subSkuData in its attributes
+            if (listing.attributes && listing.attributes.subSkuData) {
+              productSubSkuData = listing.attributes.subSkuData;
+            }
+            // If not, check if product has subSkuData
+            else if (listing.product && listing.product.attributes && listing.product.attributes.subSkuData) {
+              productSubSkuData = listing.product.attributes.subSkuData;
+            }
           }
         }
         
@@ -729,13 +736,35 @@ class ListingController {
           // Process attributes - keep all values (including numbers, arrays, nested objects)
           let finalAttributes = { ...listingData.attributes };
           
-          // Get subSKU data from the related product if multiple subSKUs exist
+          // Get subSKU data from individual products if multiple subSKUs exist
           if (listingData.subSku && listingData.subSku.includes(',')) {
             const subSkus = listingData.subSku.split(',').map(s => s.trim()).filter(s => s);
-            if (subSkus.length > 1 && product.attributes && product.attributes.subSkuData) {
-              // Copy subSKU data from product to listing attributes
-              finalAttributes.subSkuData = product.attributes.subSkuData;
-              console.log('✅ Multiple subSKUs detected in listing, copied from product:', finalAttributes.subSkuData);
+            if (subSkus.length > 1) {
+              // Generate subSKU data by mapping from individual products
+              finalAttributes.subSkuData = {};
+              
+              for (const subSku of subSkus) {
+                const individualProduct = await prisma.product.findFirst({
+                  where: { 
+                    subSku: subSku,
+                    subSku: { 
+                      equals: subSku,
+                      not: { contains: ',' }
+                    }
+                  }
+                });
+                
+                if (individualProduct) {
+                  finalAttributes.subSkuData[subSku] = {
+                    name: `${individualProduct.attributes?.subCategory || 'Unknown'}-${subSku}`,
+                    brandRealPrice: parseFloat(individualProduct.brandRealPrice),
+                    mainImageUrl: individualProduct.mainImageUrl,
+                    galleryImages: individualProduct.galleryImages || []
+                  };
+                }
+              }
+              
+              console.log('✅ Multiple subSKUs detected in listing, mapped from individual products:', finalAttributes.subSkuData);
             }
           }
           
