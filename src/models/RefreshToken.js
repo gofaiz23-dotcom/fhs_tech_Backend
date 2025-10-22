@@ -63,6 +63,32 @@ class RefreshTokenModel {
       }
     });
   }
+
+  // Clean old active tokens (older than 7 days)
+  static async cleanOldActiveTokens() {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return await prisma.refreshToken.deleteMany({
+      where: {
+        createdAt: { lt: sevenDaysAgo },
+        isRevoked: false,
+        expiresAt: { gt: new Date() }
+      }
+    });
+  }
+
+  // Clean all old tokens (expired + old active)
+  static async cleanAllOldTokens() {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return await prisma.refreshToken.deleteMany({
+      where: {
+        OR: [
+          { expiresAt: { lt: new Date() } },
+          { isRevoked: true },
+          { createdAt: { lt: sevenDaysAgo } }
+        ]
+      }
+    });
+  }
 }
 
 export default RefreshTokenModel;

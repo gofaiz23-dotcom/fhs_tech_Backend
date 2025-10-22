@@ -1,6 +1,7 @@
 import app from './app.js';
 import dotenv from 'dotenv';
 import dbConnection from './src/config/database.js';
+import TokenCleanup from './src/utils/tokenCleanup.js';
 
 // Load environment variables
 dotenv.config();
@@ -43,6 +44,9 @@ async function startServer() {
       console.log(`📊 Health Check: http://192.168.0.23:${PORT}/api/health`);
       console.log(`💾 Database: ${healthCheck.status}`);
     });
+
+    // Start industry-level cron jobs for token cleanup
+    TokenCleanup.startCronJobs();
 
     // Handle server errors
     server.on('error', (error) => {

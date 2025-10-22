@@ -108,6 +108,9 @@ class AuthController {
         userId: user.id
       });
 
+      // Clean up expired tokens before creating new one
+      await RefreshTokenModel.cleanExpiredTokens();
+      
       // Hash and store refresh token
       const refreshTokenHash = hashToken(refreshToken);
       await RefreshTokenModel.create({
@@ -165,6 +168,9 @@ class AuthController {
         });
       }
 
+      // Clean up expired tokens first
+      await RefreshTokenModel.cleanExpiredTokens();
+      
       // Verify refresh token
       const decoded = verifyToken(refreshToken);
       const refreshTokenHash = hashToken(refreshToken);
