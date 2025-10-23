@@ -107,6 +107,7 @@ class ProductController {
         userId: req.user.userId
       });
 
+
       // Get base URL from environment
       const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL;
       
@@ -159,26 +160,22 @@ class ProductController {
                 cleanedProduct.attributes.subSkuData[firstSubSku].name === cleanedProduct.attributes.subCategory;
               
               if (hasCorrectMapping) {
-                // Process existing subSKU data images
+                // Process existing stored subSkuData - add base URL on retrieval
                 Object.keys(cleanedProduct.attributes.subSkuData).forEach(subSku => {
                   const subSkuData = cleanedProduct.attributes.subSkuData[subSku];
                   
-                  // Process main image for this subSKU
-                  if (subSkuData.mainImageUrl) {
-                    if (subSkuData.mainImageUrl.startsWith('/uploads/')) {
-                      let imagePath = subSkuData.mainImageUrl.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
-                      subSkuData.mainImageUrl = `${IMAGE_BASE_URL}${imagePath}`;
-                    }
+                  // Add base URL to main image (if it's a relative URL)
+                  if (subSkuData.mainImageUrl && subSkuData.mainImageUrl.startsWith('/uploads/')) {
+                    subSkuData.mainImageUrl = `${IMAGE_BASE_URL}${subSkuData.mainImageUrl}`;
                   }
                   
-                  // Process gallery images for this subSKU
+                  // Add base URL to gallery images (if they're relative URLs)
                   if (Array.isArray(subSkuData.galleryImages)) {
                     subSkuData.galleryImages = subSkuData.galleryImages
                       .filter(img => img && !img.startsWith('data:image/'))
                       .map(img => {
                         if (img.startsWith('/uploads/')) {
-                          let imagePath = img.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
-                          return `${IMAGE_BASE_URL}${imagePath}`;
+                          return `${IMAGE_BASE_URL}${img}`;
                         }
                         return img;
                       });
@@ -196,11 +193,32 @@ class ProductController {
                   
                   // Only add to subSkuData if the individual product exists
                   if (relatedProduct) {
+                    // Process main image URL with base URL
+                    let processedMainImageUrl = relatedProduct.mainImageUrl;
+                    if (processedMainImageUrl && processedMainImageUrl.startsWith('/uploads/')) {
+                      let imagePath = processedMainImageUrl.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                      processedMainImageUrl = `${IMAGE_BASE_URL}${imagePath}`;
+                    }
+                    
+                    // Process gallery images with base URL
+                    let processedGalleryImages = [];
+                    if (relatedProduct.galleryImages && Array.isArray(relatedProduct.galleryImages)) {
+                      processedGalleryImages = relatedProduct.galleryImages
+                        .filter(img => img && !img.startsWith('data:image/'))
+                        .map(img => {
+                          if (img.startsWith('/uploads/')) {
+                            let imagePath = img.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                            return `${IMAGE_BASE_URL}${imagePath}`;
+                          }
+                          return img;
+                        });
+                    }
+                    
                     cleanedProduct.attributes.subSkuData[subSku] = {
                       name: `${cleanedProduct.attributes.subCategory || 'Unknown'}-${subSku}`,
                       brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
-                      mainImageUrl: cleanedProduct.mainImageUrl,
-                      galleryImages: cleanedProduct.galleryImages || []
+                      mainImageUrl: processedMainImageUrl, // ← Processed with base URL
+                      galleryImages: processedGalleryImages // ← Processed with base URL
                     };
                   }
                 }
@@ -220,11 +238,32 @@ class ProductController {
                 
                 // Only add to subSkuData if the individual product exists
                 if (relatedProduct) {
+                  // Process main image URL with base URL
+                  let processedMainImageUrl = relatedProduct.mainImageUrl;
+                  if (processedMainImageUrl && processedMainImageUrl.startsWith('/uploads/')) {
+                    let imagePath = processedMainImageUrl.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                    processedMainImageUrl = `${IMAGE_BASE_URL}${imagePath}`;
+                  }
+                  
+                  // Process gallery images with base URL
+                  let processedGalleryImages = [];
+                  if (relatedProduct.galleryImages && Array.isArray(relatedProduct.galleryImages)) {
+                    processedGalleryImages = relatedProduct.galleryImages
+                      .filter(img => img && !img.startsWith('data:image/'))
+                      .map(img => {
+                        if (img.startsWith('/uploads/')) {
+                          let imagePath = img.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                          return `${IMAGE_BASE_URL}${imagePath}`;
+                        }
+                        return img;
+                      });
+                  }
+                  
                   cleanedProduct.attributes.subSkuData[subSku] = {
                     name: `${cleanedProduct.attributes.subCategory || 'Unknown'}-${subSku}`,
                     brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
-                    mainImageUrl: cleanedProduct.mainImageUrl,
-                    galleryImages: cleanedProduct.galleryImages || []
+                    mainImageUrl: processedMainImageUrl, // ← Processed with base URL
+                    galleryImages: processedGalleryImages // ← Processed with base URL
                   };
                 }
               }
@@ -590,11 +629,32 @@ class ProductController {
                   where: { subSku: subSku }
                 });
                 
+                // Store relative URLs (no base URL) in database
+                let relativeMainImageUrl = relatedProduct.mainImageUrl;
+                if (relativeMainImageUrl && relativeMainImageUrl.startsWith('/uploads/')) {
+                  // Convert to relative URL for storage
+                  relativeMainImageUrl = relativeMainImageUrl.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                }
+                
+                // Store relative gallery images (no base URL) in database
+                let relativeGalleryImages = [];
+                if (relatedProduct.galleryImages && Array.isArray(relatedProduct.galleryImages)) {
+                  relativeGalleryImages = relatedProduct.galleryImages
+                    .filter(img => img && !img.startsWith('data:image/'))
+                    .map(img => {
+                      if (img.startsWith('/uploads/')) {
+                        // Convert to relative URL for storage
+                        return img.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                      }
+                      return img;
+                    });
+                }
+                
                 finalAttributes.subSkuData[subSku] = {
                   name: `${productData.attributes?.subCategory || 'Unknown'}-${subSku}`,
                   brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
-                  mainImageUrl: productData.mainImageUrl || null,
-                  galleryImages: productData.galleryImages || []
+                  mainImageUrl: relativeMainImageUrl, // ← Relative URL for storage
+                  galleryImages: relativeGalleryImages // ← Relative URLs for storage
                 };
               }
               
@@ -602,9 +662,13 @@ class ProductController {
             }
           }
           
-          // Filter out empty/null values from attributes
+          // Filter out empty/null values from attributes (but keep subSkuData)
           Object.keys(finalAttributes).forEach(key => {
             const value = finalAttributes[key];
+            // Don't delete subSkuData even if it appears empty
+            if (key === 'subSkuData') {
+              return; // Keep subSkuData
+            }
             if (value === null || value === undefined || value === '' || 
                 (Array.isArray(value) && value.length === 0) ||
                 (typeof value === 'object' && Object.keys(value).length === 0)) {
@@ -681,6 +745,7 @@ class ProductController {
             attributes: finalAttributes
           });
 
+
           // Add full URLs for response (prepend base URL)
           const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL;
           const productWithFullUrls = {
@@ -696,6 +761,7 @@ class ProductController {
           };
 
           results.created.push(productWithFullUrls);
+
 
         } catch (error) {
           results.errors.push({
@@ -751,7 +817,13 @@ class ProductController {
   static async updateProduct(req, res) {
     try {
       const productId = parseInt(req.params.id);
-      const { title, groupSku, subSku, category, collectionName, singleSetItem, attributes } = req.body;
+      const { 
+        title, groupSku, subSku, category, collectionName, singleSetItem, 
+        attributes, mainImageUrl, galleryImages, brandId,
+        // All price fields except brandPrice and ecommercePrice (calculated)
+        brandRealPrice, brandMiscellaneous, msrp,
+        shippingPrice, commissionPrice, profitMarginPrice, ecommerceMiscellaneous
+      } = req.body;
 
       // Check if product exists
       const existingProduct = await ProductModel.findById(productId);
@@ -786,11 +858,24 @@ class ProductController {
         category,
         collectionName,
         singleSetItem,
-        attributes
+        attributes,
+        mainImageUrl,
+        galleryImages,
+        brandId,
+        // All price fields except brandPrice and ecommercePrice (calculated)
+        brandRealPrice,
+        brandMiscellaneous,
+        msrp,
+        shippingPrice,
+        commissionPrice,
+        profitMarginPrice,
+        ecommerceMiscellaneous
       });
 
-      // Auto-update related products and listings with multiple subSKUs
-      await ProductController.autoUpdateRelatedSubSkuData(updatedProduct);
+      // Auto-update related multi-subSKU products and listings if this is a single subSKU product
+      if (updatedProduct.subSku && !updatedProduct.subSku.includes(',')) {
+        await ProductController.autoUpdateSubSkuData(updatedProduct);
+      }
 
       res.json({
         message: 'Product updated successfully',
@@ -998,8 +1083,6 @@ class ProductController {
             galleryImages: galleryImages
           });
 
-          // Auto-update related products and listings with multiple subSKUs
-          await ProductController.autoUpdateRelatedSubSkuData(updatedProduct);
 
           return updatedProduct;
         },
@@ -1098,8 +1181,6 @@ class ProductController {
             }
           });
 
-          // Auto-update related products and listings with multiple subSKUs
-          await ProductController.autoUpdateRelatedSubSkuData(updatedProduct);
 
           results.updated.push({
             groupSku: item.groupSku,
@@ -1889,6 +1970,7 @@ class ProductController {
                 attributes: productData.attributes || {}
               });
 
+
               tracker.updateProgress(jobId, {
                 processed: i + 1,
                 success: (tracker.getJob(jobId).data.success || 0) + 1
@@ -2152,118 +2234,109 @@ class ProductController {
     }
   }
 
-  // Auto-update related products and listings when single product changes
-  static async autoUpdateRelatedSubSkuData(updatedProduct) {
+  // Auto-update mechanism: when single product is updated, update all related multi-subSKU products and listings
+  static async autoUpdateSubSkuData(updatedSingleProduct) {
     try {
-      console.log('🔄 Auto-updating related subSkuData for product:', updatedProduct.id);
+      const subSku = updatedSingleProduct.subSku;
+      console.log(`🔄 Auto-updating subSkuData for subSKU: ${subSku}`);
       
-      // 1. Update PRODUCTS with multiple subSKUs that contain this product's subSku
+      // Find all products that have this subSKU in their subSku list
       const relatedProducts = await prisma.product.findMany({
         where: {
-          subSku: {
-            contains: updatedProduct.subSku
-          },
-          id: {
-            not: updatedProduct.id // Don't update the same product
-          }
+          subSku: { contains: subSku },
+          id: { not: updatedSingleProduct.id }
         }
       });
-
-      console.log(`📦 Found ${relatedProducts.length} related products to update`);
-
-      for (const product of relatedProducts) {
-        if (product.subSku && product.subSku.includes(',')) {
-          const subSkus = product.subSku.split(',').map(s => s.trim()).filter(s => s);
-          
-          if (subSkus.includes(updatedProduct.subSku)) {
-            // Update the subSkuData in this product's attributes
-            const currentAttributes = product.attributes || {};
-            const updatedSubSkuData = { ...currentAttributes.subSkuData };
-            
-            updatedSubSkuData[updatedProduct.subSku] = {
-              name: `${updatedProduct.attributes?.subCategory || 'Unknown'}-${updatedProduct.subSku}`,
-              brandRealPrice: parseFloat(updatedProduct.brandRealPrice),
-              mainImageUrl: updatedProduct.mainImageUrl,
-              galleryImages: updatedProduct.galleryImages || [],
-              // Sync ALL product fields
-              title: updatedProduct.title,
-              category: updatedProduct.category,
-              collectionName: updatedProduct.collectionName,
-              singleSetItem: updatedProduct.singleSetItem,
-              groupSku: updatedProduct.groupSku,
-              subSku: updatedProduct.subSku,
-              attributes: updatedProduct.attributes
-            };
-            
-            await prisma.product.update({
-              where: { id: product.id },
-              data: {
-                attributes: {
-                  ...currentAttributes,
-                  subSkuData: updatedSubSkuData
-                }
-              }
-            });
-            
-            console.log(`✅ Updated product ${product.id} subSkuData`);
-          }
-        }
-      }
-
-      // 2. Update LISTINGS with multiple subSKUs that contain this product's subSku
+      
+      // Find all listings that have this subSKU in their subSku list  
       const relatedListings = await prisma.listing.findMany({
         where: {
-          subSku: {
-            contains: updatedProduct.subSku
-          }
+          subSku: { contains: subSku }
         }
       });
-
-      console.log(`📋 Found ${relatedListings.length} related listings to update`);
-
-      for (const listing of relatedListings) {
-        if (listing.subSku && listing.subSku.includes(',')) {
-          const subSkus = listing.subSku.split(',').map(s => s.trim()).filter(s => s);
-          
-          if (subSkus.includes(updatedProduct.subSku)) {
-            // Update the subSkuData in this listing's attributes
-            const currentAttributes = listing.attributes || {};
-            const updatedSubSkuData = { ...currentAttributes.subSkuData };
-            
-            updatedSubSkuData[updatedProduct.subSku] = {
-              name: `${updatedProduct.attributes?.subCategory || 'Unknown'}-${updatedProduct.subSku}`,
-              brandRealPrice: parseFloat(updatedProduct.brandRealPrice),
-              mainImageUrl: updatedProduct.mainImageUrl,
-              galleryImages: updatedProduct.galleryImages || [],
-              // Sync ALL product fields
-              title: updatedProduct.title,
-              category: updatedProduct.category,
-              collectionName: updatedProduct.collectionName,
-              singleSetItem: updatedProduct.singleSetItem,
-              groupSku: updatedProduct.groupSku,
-              subSku: updatedProduct.subSku,
-              attributes: updatedProduct.attributes
-            };
-            
-            await prisma.listing.update({
-              where: { id: listing.id },
-              data: {
-                attributes: {
-                  ...currentAttributes,
-                  subSkuData: updatedSubSkuData
-                }
-              }
-            });
-            
-            console.log(`✅ Updated listing ${listing.id} subSkuData`);
+      
+      console.log(`📦 Found ${relatedProducts.length} related products and ${relatedListings.length} related listings`);
+      
+      // Update each related product
+      for (const product of relatedProducts) {
+        if (product.attributes && product.attributes.subSkuData && product.attributes.subSkuData[subSku]) {
+          // Update the specific subSKU data with relative URLs
+          let relativeMainImageUrl = updatedSingleProduct.mainImageUrl;
+          if (relativeMainImageUrl && relativeMainImageUrl.startsWith('/uploads/')) {
+            relativeMainImageUrl = relativeMainImageUrl.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
           }
+          
+          let relativeGalleryImages = [];
+          if (updatedSingleProduct.galleryImages && Array.isArray(updatedSingleProduct.galleryImages)) {
+            relativeGalleryImages = updatedSingleProduct.galleryImages
+              .filter(img => img && !img.startsWith('data:image/'))
+              .map(img => {
+                if (img.startsWith('/uploads/')) {
+                  return img.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                }
+                return img;
+              });
+          }
+          
+          product.attributes.subSkuData[subSku] = {
+            name: updatedSingleProduct.title,
+            brandRealPrice: parseFloat(updatedSingleProduct.brandRealPrice),
+            mainImageUrl: relativeMainImageUrl, // Relative URL
+            galleryImages: relativeGalleryImages // Relative URLs
+          };
+          
+          // Save to database
+          await prisma.product.update({
+            where: { id: product.id },
+            data: { attributes: product.attributes }
+          });
+          
+          console.log(`✅ Updated product ${product.id} subSkuData for ${subSku}`);
         }
       }
       
-      console.log('✅ Auto-update completed successfully');
+      // Update each related listing
+      for (const listing of relatedListings) {
+        if (listing.attributes && listing.attributes.subSkuData && listing.attributes.subSkuData[subSku]) {
+          // Update the specific subSKU data with relative URLs
+          let relativeMainImageUrl = updatedSingleProduct.mainImageUrl;
+          if (relativeMainImageUrl && relativeMainImageUrl.startsWith('/uploads/')) {
+            relativeMainImageUrl = relativeMainImageUrl.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+          }
+          
+          let relativeGalleryImages = [];
+          if (updatedSingleProduct.galleryImages && Array.isArray(updatedSingleProduct.galleryImages)) {
+            relativeGalleryImages = updatedSingleProduct.galleryImages
+              .filter(img => img && !img.startsWith('data:image/'))
+              .map(img => {
+                if (img.startsWith('/uploads/')) {
+                  return img.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                }
+                return img;
+              });
+          }
+          
+          listing.attributes.subSkuData[subSku] = {
+            name: updatedSingleProduct.title,
+            brandRealPrice: parseFloat(updatedSingleProduct.brandRealPrice),
+            mainImageUrl: relativeMainImageUrl, // Relative URL
+            galleryImages: relativeGalleryImages // Relative URLs
+          };
+          
+          // Save to database
+          await prisma.listing.update({
+            where: { id: listing.id },
+            data: { attributes: listing.attributes }
+          });
+          
+          console.log(`✅ Updated listing ${listing.id} subSkuData for ${subSku}`);
+        }
+      }
+      
+      console.log(`🎉 Auto-update completed for subSKU: ${subSku}`);
+      
     } catch (error) {
-      console.error('❌ Error in auto-update:', error);
-      // Don't throw error - this shouldn't break the product update
+      console.error('❌ Auto-update error:', error);
     }
   }
 

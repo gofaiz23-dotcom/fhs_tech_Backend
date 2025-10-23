@@ -242,7 +242,7 @@ class ListingController {
       const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL;
 
       // Filter base64 images and prepend base URL to local paths
-      const cleanListings = listingsWithInventoryStats.map(listing => {
+      const cleanListings = await Promise.all(listingsWithInventoryStats.map(async (listing) => {
         const cleanedListing = { ...listing };
         
         // Process mainImageUrl
@@ -280,37 +280,98 @@ class ListingController {
         // Process subSKU data for listings with multiple subSKUs (from attributes)
         if (cleanedListing.subSku && cleanedListing.subSku.includes(',')) {
           const subSkus = cleanedListing.subSku.split(',').map(s => s.trim()).filter(s => s);
-          if (subSkus.length > 1 && cleanedListing.attributes && cleanedListing.attributes.subSkuData) {
-            // Process subSKU data images from attributes
-            Object.keys(cleanedListing.attributes.subSkuData).forEach(subSku => {
-              const subSkuData = cleanedListing.attributes.subSkuData[subSku];
+          if (subSkus.length > 1) {
+            // Check if subSkuData already exists in attributes
+            if (cleanedListing.attributes && cleanedListing.attributes.subSkuData) {
+              // Process existing stored subSkuData - add base URL on retrieval
+              Object.keys(cleanedListing.attributes.subSkuData).forEach(subSku => {
+                const subSkuData = cleanedListing.attributes.subSkuData[subSku];
+                
+                // Add base URL to main image (if it's a relative URL)
+                if (subSkuData.mainImageUrl && subSkuData.mainImageUrl.startsWith('/uploads/')) {
+                  subSkuData.mainImageUrl = `${IMAGE_BASE_URL}${subSkuData.mainImageUrl}`;
+                }
+                
+                // Add base URL to gallery images (if they're relative URLs)
+                if (Array.isArray(subSkuData.galleryImages)) {
+                  subSkuData.galleryImages = subSkuData.galleryImages
+                    .filter(img => img && !img.startsWith('data:image/'))
+                    .map(img => {
+                      if (img.startsWith('/uploads/')) {
+                        return `${IMAGE_BASE_URL}${img}`;
+                      }
+                      return img;
+                    });
+                }
+              });
+            } else {
+              // Generate subSkuData for existing listings with multiple subSKUs (similar to products)
+              cleanedListing.attributes = cleanedListing.attributes || {};
+              cleanedListing.attributes.subSkuData = {};
               
-              // Process main image for this subSKU
-              if (subSkuData.mainImageUrl) {
-                if (subSkuData.mainImageUrl.startsWith('/uploads/')) {
-                  let imagePath = subSkuData.mainImageUrl.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
-                  subSkuData.mainImageUrl = `${IMAGE_BASE_URL}${imagePath}`;
+              // Get individual subSKU data from related products
+              for (const subSku of subSkus) {
+                try {
+                  const relatedProduct = await prisma.product.findFirst({
+                    where: { subSku: subSku }
+                  });
+                  
+                  if (relatedProduct) {
+                    // Process main image URL with base URL
+                    let processedMainImageUrl = relatedProduct.mainImageUrl;
+                    if (processedMainImageUrl && processedMainImageUrl.startsWith('/uploads/')) {
+                      let imagePath = processedMainImageUrl.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                      processedMainImageUrl = `${IMAGE_BASE_URL}${imagePath}`;
+                    }
+                    
+                    // Process gallery images with base URL
+                    let processedGalleryImages = [];
+                    if (relatedProduct.galleryImages && Array.isArray(relatedProduct.galleryImages)) {
+                      processedGalleryImages = relatedProduct.galleryImages
+                        .filter(img => img && !img.startsWith('data:image/'))
+                        .map(img => {
+                          if (img.startsWith('/uploads/')) {
+                            let imagePath = img.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                            return `${IMAGE_BASE_URL}${imagePath}`;
+                          }
+                          return img;
+                        });
+                    }
+                    
+                    cleanedListing.attributes.subSkuData[subSku] = {
+                      name: `${cleanedListing.attributes.subCategory || 'Unknown'}-${subSku}`,
+                      brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
+                      mainImageUrl: processedMainImageUrl, // ← Processed with base URL
+                      galleryImages: processedGalleryImages // ← Processed with base URL
+                    };
+                  } else {
+                    // If individual product not found, create basic entry
+                    cleanedListing.attributes.subSkuData[subSku] = {
+                      name: `${cleanedListing.attributes.subCategory || 'Unknown'}-${subSku}`,
+                      brandRealPrice: parseFloat(cleanedListing.brandRealPrice),
+                      mainImageUrl: cleanedListing.mainImageUrl,
+                      galleryImages: cleanedListing.galleryImages || []
+                    };
+                  }
+                } catch (error) {
+                  console.error(`Error fetching product for subSku ${subSku}:`, error);
+                  // Create basic entry on error
+                  cleanedListing.attributes.subSkuData[subSku] = {
+                    name: `${cleanedListing.attributes.subCategory || 'Unknown'}-${subSku}`,
+                    brandRealPrice: parseFloat(cleanedListing.brandRealPrice),
+                    mainImageUrl: cleanedListing.mainImageUrl,
+                    galleryImages: cleanedListing.galleryImages || []
+                  };
                 }
               }
               
-              // Process gallery images for this subSKU
-              if (Array.isArray(subSkuData.galleryImages)) {
-                subSkuData.galleryImages = subSkuData.galleryImages
-                  .filter(img => img && !img.startsWith('data:image/'))
-                  .map(img => {
-                    if (img.startsWith('/uploads/')) {
-                      let imagePath = img.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
-                      return `${IMAGE_BASE_URL}${imagePath}`;
-                    }
-                    return img;
-                  });
-              }
-            });
+              console.log('✅ Generated subSkuData for existing listing:', cleanedListing.attributes.subSkuData);
+            }
           }
         }
         
         return cleanedListing;
-      });
+      }));
 
       res.json({
         message: 'Listings retrieved successfully',
@@ -723,35 +784,70 @@ class ListingController {
           // Process attributes - keep all values (including numbers, arrays, nested objects)
           let finalAttributes = { ...listingData.attributes };
           
-          // Get subSKU data from individual products if multiple subSKUs exist
+          // Process subSKU data if multiple subSKUs exist (similar to product creation)
           if (listingData.subSku && listingData.subSku.includes(',')) {
             const subSkus = listingData.subSku.split(',').map(s => s.trim()).filter(s => s);
             if (subSkus.length > 1) {
-              // Generate subSKU data by mapping from individual products
+              // Generate subSkuData for listings with multiple subSKUs
               finalAttributes.subSkuData = {};
               
               for (const subSku of subSkus) {
-                const individualProduct = await prisma.product.findFirst({
-                  where: { 
-                    subSku: subSku,
-                    subSku: { 
-                      equals: subSku,
-                      not: { contains: ',' }
+                try {
+                  // Get individual subSKU data from related products
+                  const relatedProduct = await prisma.product.findFirst({
+                    where: { subSku: subSku }
+                  });
+                  
+                  if (relatedProduct) {
+                    // Store relative URLs (no base URL) in database
+                    let relativeMainImageUrl = relatedProduct.mainImageUrl;
+                    if (relativeMainImageUrl && relativeMainImageUrl.startsWith('/uploads/')) {
+                      // Convert to relative URL for storage
+                      relativeMainImageUrl = relativeMainImageUrl.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
                     }
+                    
+                    // Store relative gallery images (no base URL) in database
+                    let relativeGalleryImages = [];
+                    if (relatedProduct.galleryImages && Array.isArray(relatedProduct.galleryImages)) {
+                      relativeGalleryImages = relatedProduct.galleryImages
+                        .filter(img => img && !img.startsWith('data:image/'))
+                        .map(img => {
+                          if (img.startsWith('/uploads/')) {
+                            // Convert to relative URL for storage
+                            return img.replace('/uploads/downloaded/', '/uploads/downloadedUrlimages/');
+                          }
+                          return img;
+                        });
+                    }
+                    
+                    finalAttributes.subSkuData[subSku] = {
+                      name: `${finalAttributes.subCategory || 'Unknown'}-${subSku}`,
+                      brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
+                      mainImageUrl: relativeMainImageUrl, // ← Relative URL for storage
+                      galleryImages: relativeGalleryImages // ← Relative URLs for storage
+                    };
+                  } else {
+                    // If individual product not found, create basic entry
+                    finalAttributes.subSkuData[subSku] = {
+                      name: `${finalAttributes.subCategory || 'Unknown'}-${subSku}`,
+                      brandRealPrice: parseFloat(listingData.brandRealPrice),
+                      mainImageUrl: listingData.mainImageUrl || null,
+                      galleryImages: listingData.galleryImages || []
+                    };
                   }
-                });
-                
-                if (individualProduct) {
+                } catch (error) {
+                  console.error(`Error fetching product for subSku ${subSku}:`, error);
+                  // Create basic entry on error
                   finalAttributes.subSkuData[subSku] = {
-                    name: `${individualProduct.attributes?.subCategory || 'Unknown'}-${subSku}`,
-                    brandRealPrice: parseFloat(individualProduct.brandRealPrice),
-                    mainImageUrl: individualProduct.mainImageUrl,
-                    galleryImages: individualProduct.galleryImages || []
+                    name: `${finalAttributes.subCategory || 'Unknown'}-${subSku}`,
+                    brandRealPrice: parseFloat(listingData.brandRealPrice),
+                    mainImageUrl: listingData.mainImageUrl || null,
+                    galleryImages: listingData.galleryImages || []
                   };
                 }
               }
               
-              console.log('✅ Multiple subSKUs detected in listing, mapped from individual products:', finalAttributes.subSkuData);
+              console.log('✅ Multiple subSKUs detected in listing, subSkuData generated:', finalAttributes.subSkuData);
             }
           }
           
@@ -936,7 +1032,14 @@ class ListingController {
   static async updateListing(req, res) {
     try {
       const listingId = parseInt(req.params.id);
-      const { title, sku, groupSku, subSku, category, collectionName, shipTypes, singleSetItem, productCounts, attributes } = req.body;
+      const { 
+        title, sku, groupSku, subSku, category, collectionName, shipTypes, 
+        singleSetItem, productCounts, attributes, mainImageUrl, galleryImages, 
+        brandId, productId,
+        // All price fields except brandPrice and ecommercePrice (calculated)
+        brandRealPrice, brandMiscellaneous, msrp,
+        shippingPrice, commissionPrice, profitMarginPrice, ecommerceMiscellaneous
+      } = req.body;
 
       // Check if listing exists
       const existingListing = await ListingModel.findById(listingId);
@@ -973,8 +1076,27 @@ class ListingController {
         shipTypes,
         singleSetItem,
         productCounts,
-        attributes
+        attributes,
+        mainImageUrl,
+        galleryImages,
+        brandId,
+        productId,
+        // All price fields except brandPrice and ecommercePrice (calculated)
+        brandRealPrice,
+        brandMiscellaneous,
+        msrp,
+        shippingPrice,
+        commissionPrice,
+        profitMarginPrice,
+        ecommerceMiscellaneous
       });
+
+      // Auto-update related multi-subSKU products and listings if this is a single subSKU listing
+      if (updatedListing.subSku && !updatedListing.subSku.includes(',')) {
+        // Import ProductController for auto-update
+        const ProductController = (await import('./productController.js')).default;
+        await ProductController.autoUpdateSubSkuData(updatedListing);
+      }
 
       res.json({
         message: 'Listing updated successfully',
