@@ -215,7 +215,7 @@ class ProductController {
                     }
                     
                     cleanedProduct.attributes.subSkuData[subSku] = {
-                      name: `${cleanedProduct.attributes.subCategory || 'Unknown'}-${subSku}`,
+                      name: `${relatedProduct.attributes?.subCategory || 'Product'}-${subSku}`,
                       brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
                       mainImageUrl: processedMainImageUrl, // ← Processed with base URL
                       galleryImages: processedGalleryImages // ← Processed with base URL
@@ -260,7 +260,7 @@ class ProductController {
                   }
                   
                   cleanedProduct.attributes.subSkuData[subSku] = {
-                    name: `${cleanedProduct.attributes.subCategory || 'Unknown'}-${subSku}`,
+                    name: `${relatedProduct.attributes?.subCategory || 'Product'}-${subSku}`,
                     brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
                     mainImageUrl: processedMainImageUrl, // ← Processed with base URL
                     galleryImages: processedGalleryImages // ← Processed with base URL
@@ -651,7 +651,7 @@ class ProductController {
                 }
                 
                 finalAttributes.subSkuData[subSku] = {
-                  name: `${productData.attributes?.subCategory || 'Unknown'}-${subSku}`,
+                  name: `${relatedProduct.attributes?.subCategory || 'Product'}-${subSku}`,
                   brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
                   mainImageUrl: relativeMainImageUrl, // ← Relative URL for storage
                   galleryImages: relativeGalleryImages // ← Relative URLs for storage
@@ -2279,7 +2279,7 @@ class ProductController {
           }
           
           product.attributes.subSkuData[subSku] = {
-            name: updatedSingleProduct.title,
+            name: `${updatedSingleProduct.attributes?.subCategory || 'Product'}-${subSku}`,
             brandRealPrice: parseFloat(updatedSingleProduct.brandRealPrice),
             mainImageUrl: relativeMainImageUrl, // Relative URL
             galleryImages: relativeGalleryImages // Relative URLs
@@ -2317,7 +2317,7 @@ class ProductController {
           }
           
           listing.attributes.subSkuData[subSku] = {
-            name: updatedSingleProduct.title,
+            name: `${updatedSingleProduct.attributes?.subCategory || 'Product'}-${subSku}`,
             brandRealPrice: parseFloat(updatedSingleProduct.brandRealPrice),
             mainImageUrl: relativeMainImageUrl, // Relative URL
             galleryImages: relativeGalleryImages // Relative URLs

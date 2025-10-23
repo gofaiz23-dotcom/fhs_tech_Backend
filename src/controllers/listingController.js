@@ -339,7 +339,7 @@ class ListingController {
                     }
                     
                     cleanedListing.attributes.subSkuData[subSku] = {
-                      name: `${cleanedListing.attributes.subCategory || 'Unknown'}-${subSku}`,
+                      name: `${relatedProduct.attributes?.subCategory || 'Product'}-${subSku}`,
                       brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
                       mainImageUrl: processedMainImageUrl, // ← Processed with base URL
                       galleryImages: processedGalleryImages // ← Processed with base URL
@@ -347,7 +347,7 @@ class ListingController {
                   } else {
                     // If individual product not found, create basic entry
                     cleanedListing.attributes.subSkuData[subSku] = {
-                      name: `${cleanedListing.attributes.subCategory || 'Unknown'}-${subSku}`,
+                      name: `Product-${subSku}`,
                       brandRealPrice: parseFloat(cleanedListing.brandRealPrice),
                       mainImageUrl: cleanedListing.mainImageUrl,
                       galleryImages: cleanedListing.galleryImages || []
@@ -357,7 +357,7 @@ class ListingController {
                   console.error(`Error fetching product for subSku ${subSku}:`, error);
                   // Create basic entry on error
                   cleanedListing.attributes.subSkuData[subSku] = {
-                    name: `${cleanedListing.attributes.subCategory || 'Unknown'}-${subSku}`,
+                    name: `Product-${subSku}`,
                     brandRealPrice: parseFloat(cleanedListing.brandRealPrice),
                     mainImageUrl: cleanedListing.mainImageUrl,
                     galleryImages: cleanedListing.galleryImages || []
@@ -821,7 +821,7 @@ class ListingController {
                     }
                     
                     finalAttributes.subSkuData[subSku] = {
-                      name: `${finalAttributes.subCategory || 'Unknown'}-${subSku}`,
+                      name: `${relatedProduct.attributes?.subCategory || 'Product'}-${subSku}`,
                       brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
                       mainImageUrl: relativeMainImageUrl, // ← Relative URL for storage
                       galleryImages: relativeGalleryImages // ← Relative URLs for storage
@@ -829,7 +829,7 @@ class ListingController {
                   } else {
                     // If individual product not found, create basic entry
                     finalAttributes.subSkuData[subSku] = {
-                      name: `${finalAttributes.subCategory || 'Unknown'}-${subSku}`,
+                      name: `Product-${subSku}`,
                       brandRealPrice: parseFloat(listingData.brandRealPrice),
                       mainImageUrl: listingData.mainImageUrl || null,
                       galleryImages: listingData.galleryImages || []
@@ -839,7 +839,7 @@ class ListingController {
                   console.error(`Error fetching product for subSku ${subSku}:`, error);
                   // Create basic entry on error
                   finalAttributes.subSkuData[subSku] = {
-                    name: `${finalAttributes.subCategory || 'Unknown'}-${subSku}`,
+                    name: `Product-${subSku}`,
                     brandRealPrice: parseFloat(listingData.brandRealPrice),
                     mainImageUrl: listingData.mainImageUrl || null,
                     galleryImages: listingData.galleryImages || []
