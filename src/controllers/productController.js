@@ -205,7 +205,7 @@ class ProductController {
                   }
                 }
                 
-                console.log('✅ Regenerated subSkuData with correct mapping:', cleanedProduct.attributes.subSkuData);
+                
               }
             } else {
               // Generate subSkuData for existing products with multiple subSKUs
@@ -229,7 +229,7 @@ class ProductController {
                 }
               }
               
-              console.log('✅ Generated subSkuData for existing product with multiple subSKUs:', cleanedProduct.attributes.subSkuData);
+              
             }
           }
         }
