@@ -842,6 +842,21 @@ class ProductController {
           finalGalleryImages = req.files.galleryImages.map(img => `/uploads/images/${img.filename}`);
           console.log('🖼️ Gallery images uploaded:', finalGalleryImages.length, finalGalleryImages);
         }
+      } 
+      // If no files uploaded, check for URLs and download them
+      else {
+        if (mainImageUrl) {
+          finalMainImageUrl = await processImage(mainImageUrl);
+          console.log('🔗 Main image URL processed:', finalMainImageUrl);
+        }
+        
+        if (galleryImages && Array.isArray(galleryImages)) {
+          const downloadedGallery = await processImages(galleryImages);
+          if (downloadedGallery.length > 0) {
+            finalGalleryImages = downloadedGallery;
+            console.log('🔗 Gallery images URLs processed:', finalGalleryImages.length, finalGalleryImages);
+          }
+        }
       }
 
       // Check if product exists
@@ -880,15 +895,15 @@ class ProductController {
         attributes,
         mainImageUrl: finalMainImageUrl,
         galleryImages: finalGalleryImages,
-        brandId,
+        brandId: parseInt(brandId),
         // All price fields except brandPrice and ecommercePrice (calculated)
-        brandRealPrice,
-        brandMiscellaneous,
-        msrp,
-        shippingPrice,
-        commissionPrice,
-        profitMarginPrice,
-        ecommerceMiscellaneous
+        brandRealPrice: parseFloat(brandRealPrice) || 0,
+        brandMiscellaneous: parseFloat(brandMiscellaneous) || 0,
+        msrp: parseFloat(msrp) || 0,
+        shippingPrice: parseFloat(shippingPrice) || 0,
+        commissionPrice: parseFloat(commissionPrice) || 0,
+        profitMarginPrice: parseFloat(profitMarginPrice) || 0,
+        ecommerceMiscellaneous: parseFloat(ecommerceMiscellaneous) || 0
       });
 
       // Auto-update related multi-subSKU products and listings if this is a single subSKU product

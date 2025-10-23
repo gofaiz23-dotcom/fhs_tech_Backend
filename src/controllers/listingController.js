@@ -465,9 +465,23 @@ class ListingController {
         // Handle JSON data (single or multiple listings)
         const { listings, productId, productGroupSku, title, groupSku, subSku, category, collectionName, shipTypes, singleSetItem, attributes } = req.body;
 
-        if (listings && Array.isArray(listings)) {
+        // Parse listings if it's a JSON string (from FormData)
+        let parsedListings = listings;
+        if (typeof listings === 'string') {
+          try {
+            parsedListings = JSON.parse(listings);
+          } catch (error) {
+            console.error('Error parsing listings JSON:', error);
+            return res.status(400).json({
+              error: 'Invalid listings format',
+              message: 'Listings data must be valid JSON'
+            });
+          }
+        }
+
+        if (parsedListings && Array.isArray(parsedListings)) {
           // Multiple listings with case-insensitive field extraction
-          listingsToCreate = listings.map(listing => ({
+          listingsToCreate = parsedListings.map(listing => ({
             productId: ListingController.getFieldValue(listing, 'productId'),
             productGroupSku: ListingController.getFieldValue(listing, 'productGroupSku'),
             brandId: ListingController.getFieldValue(listing, 'brandId'),
@@ -1058,6 +1072,21 @@ class ListingController {
           finalGalleryImages = req.files.galleryImages.map(img => `/uploads/images/${img.filename}`);
           console.log('🖼️ Gallery images uploaded:', finalGalleryImages.length, finalGalleryImages);
         }
+      } 
+      // If no files uploaded, check for URLs and download them
+      else {
+        if (mainImageUrl) {
+          finalMainImageUrl = await processImage(mainImageUrl);
+          console.log('🔗 Main image URL processed:', finalMainImageUrl);
+        }
+        
+        if (galleryImages && Array.isArray(galleryImages)) {
+          const downloadedGallery = await processImages(galleryImages);
+          if (downloadedGallery.length > 0) {
+            finalGalleryImages = downloadedGallery;
+            console.log('🔗 Gallery images URLs processed:', finalGalleryImages.length, finalGalleryImages);
+          }
+        }
       }
 
       // Check if listing exists
@@ -1086,7 +1115,8 @@ class ListingController {
         }
       }
 
-      const updatedListing = await ListingModel.update(listingId, {
+      // Prepare update data object
+      const updateData = {
         title,
         sku: sku || groupSku,
         subSku,
@@ -1094,21 +1124,28 @@ class ListingController {
         collectionName,
         shipTypes,
         singleSetItem,
-        productCounts,
         attributes,
         mainImageUrl: finalMainImageUrl,
         galleryImages: finalGalleryImages,
-        brandId,
-        productId,
         // All price fields except brandPrice and ecommercePrice (calculated)
-        brandRealPrice,
-        brandMiscellaneous,
-        msrp,
-        shippingPrice,
-        commissionPrice,
-        profitMarginPrice,
-        ecommerceMiscellaneous
-      });
+        brandRealPrice: parseFloat(brandRealPrice) || 0,
+        brandMiscellaneous: parseFloat(brandMiscellaneous) || 0,
+        msrp: parseFloat(msrp) || 0,
+        shippingPrice: parseFloat(shippingPrice) || 0,
+        commissionPrice: parseFloat(commissionPrice) || 0,
+        profitMarginPrice: parseFloat(profitMarginPrice) || 0,
+        ecommerceMiscellaneous: parseFloat(ecommerceMiscellaneous) || 0
+      };
+
+      // Only include productCounts if it's provided and not undefined
+      if (productCounts !== undefined) {
+        updateData.productCounts = productCounts;
+      }
+
+      // Note: brandId updates are not allowed for listings as they are tied to products
+      // The brandId should remain the same as the original listing's brandId
+
+      const updatedListing = await ListingModel.update(listingId, updateData);
 
       // Auto-update related multi-subSKU products and listings if this is a single subSKU listing
       if (updatedListing.subSku && !updatedListing.subSku.includes(',')) {
