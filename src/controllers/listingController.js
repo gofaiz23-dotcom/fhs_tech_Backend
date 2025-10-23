@@ -159,21 +159,8 @@ class ListingController {
           }
         }
         
-        // Get subSKU data from related product if multiple subSKUs exist
-        let productSubSkuData = null;
-        if (listing.subSku && listing.subSku.includes(',')) {
-          const subSkus = listing.subSku.split(',').map(s => s.trim()).filter(s => s);
-          if (subSkus.length > 1) {
-            // First check if listing has subSkuData in its attributes
-            if (listing.attributes && listing.attributes.subSkuData) {
-              productSubSkuData = listing.attributes.subSkuData;
-            }
-            // If not, check if product has subSkuData
-            else if (listing.product && listing.product.attributes && listing.product.attributes.subSkuData) {
-              productSubSkuData = listing.product.attributes.subSkuData;
-            }
-          }
-        }
+        // SubSKU data is already available in listing.attributes.subSkuData
+        // No need to duplicate it as productSubSkuData
         
         // Calculate minimum quantity from inventoryArray
         if (inventoryArray.length > 0) {
@@ -205,8 +192,8 @@ class ListingController {
           inventory: inventoryRecords,  // Inventory records in subSku order
           inventoryArray: inventoryArray,  // Quantities in SAME order as subSkus
           quantity: minQuantity,            // Min quantity (or direct if single)
-          status: status,                   // Stock status
-          productSubSkuData: productSubSkuData  // SubSKU data from product
+          status: status                   // Stock status
+          // Removed productSubSkuData - data is already in attributes.subSkuData
         };
       }));
 
@@ -290,13 +277,13 @@ class ListingController {
           }
         }
         
-        // Process subSKU data for listings with multiple subSKUs (from product)
+        // Process subSKU data for listings with multiple subSKUs (from attributes)
         if (cleanedListing.subSku && cleanedListing.subSku.includes(',')) {
           const subSkus = cleanedListing.subSku.split(',').map(s => s.trim()).filter(s => s);
-          if (subSkus.length > 1 && cleanedListing.productSubSkuData) {
-            // Process subSKU data images from product
-            Object.keys(cleanedListing.productSubSkuData).forEach(subSku => {
-              const subSkuData = cleanedListing.productSubSkuData[subSku];
+          if (subSkus.length > 1 && cleanedListing.attributes && cleanedListing.attributes.subSkuData) {
+            // Process subSKU data images from attributes
+            Object.keys(cleanedListing.attributes.subSkuData).forEach(subSku => {
+              const subSkuData = cleanedListing.attributes.subSkuData[subSku];
               
               // Process main image for this subSKU
               if (subSkuData.mainImageUrl) {

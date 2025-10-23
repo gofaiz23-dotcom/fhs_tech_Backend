@@ -789,6 +789,9 @@ class ProductController {
         attributes
       });
 
+      // Auto-update related products and listings with multiple subSKUs
+      await ProductController.autoUpdateRelatedSubSkuData(updatedProduct);
+
       res.json({
         message: 'Product updated successfully',
         productId: productId,
@@ -990,10 +993,15 @@ class ProductController {
           }
 
           // Update product
-          return await ProductModel.update(product.id, {
+          const updatedProduct = await ProductModel.update(product.id, {
             mainImageUrl: mainImage,
             galleryImages: galleryImages
           });
+
+          // Auto-update related products and listings with multiple subSKUs
+          await ProductController.autoUpdateRelatedSubSkuData(updatedProduct);
+
+          return updatedProduct;
         },
         50 // Batch size
       );
@@ -1089,6 +1097,9 @@ class ProductController {
               galleryImages: finalGalleryImages
             }
           });
+
+          // Auto-update related products and listings with multiple subSKUs
+          await ProductController.autoUpdateRelatedSubSkuData(updatedProduct);
 
           results.updated.push({
             groupSku: item.groupSku,
@@ -2138,6 +2149,121 @@ class ProductController {
         error: 'Failed to queue bulk image upload',
         details: error.message
       });
+    }
+  }
+
+  // Auto-update related products and listings when single product changes
+  static async autoUpdateRelatedSubSkuData(updatedProduct) {
+    try {
+      console.log('🔄 Auto-updating related subSkuData for product:', updatedProduct.id);
+      
+      // 1. Update PRODUCTS with multiple subSKUs that contain this product's subSku
+      const relatedProducts = await prisma.product.findMany({
+        where: {
+          subSku: {
+            contains: updatedProduct.subSku
+          },
+          id: {
+            not: updatedProduct.id // Don't update the same product
+          }
+        }
+      });
+
+      console.log(`📦 Found ${relatedProducts.length} related products to update`);
+
+      for (const product of relatedProducts) {
+        if (product.subSku && product.subSku.includes(',')) {
+          const subSkus = product.subSku.split(',').map(s => s.trim()).filter(s => s);
+          
+          if (subSkus.includes(updatedProduct.subSku)) {
+            // Update the subSkuData in this product's attributes
+            const currentAttributes = product.attributes || {};
+            const updatedSubSkuData = { ...currentAttributes.subSkuData };
+            
+            updatedSubSkuData[updatedProduct.subSku] = {
+              name: `${updatedProduct.attributes?.subCategory || 'Unknown'}-${updatedProduct.subSku}`,
+              brandRealPrice: parseFloat(updatedProduct.brandRealPrice),
+              mainImageUrl: updatedProduct.mainImageUrl,
+              galleryImages: updatedProduct.galleryImages || [],
+              // Sync ALL product fields
+              title: updatedProduct.title,
+              category: updatedProduct.category,
+              collectionName: updatedProduct.collectionName,
+              singleSetItem: updatedProduct.singleSetItem,
+              groupSku: updatedProduct.groupSku,
+              subSku: updatedProduct.subSku,
+              attributes: updatedProduct.attributes
+            };
+            
+            await prisma.product.update({
+              where: { id: product.id },
+              data: {
+                attributes: {
+                  ...currentAttributes,
+                  subSkuData: updatedSubSkuData
+                }
+              }
+            });
+            
+            console.log(`✅ Updated product ${product.id} subSkuData`);
+          }
+        }
+      }
+
+      // 2. Update LISTINGS with multiple subSKUs that contain this product's subSku
+      const relatedListings = await prisma.listing.findMany({
+        where: {
+          subSku: {
+            contains: updatedProduct.subSku
+          }
+        }
+      });
+
+      console.log(`📋 Found ${relatedListings.length} related listings to update`);
+
+      for (const listing of relatedListings) {
+        if (listing.subSku && listing.subSku.includes(',')) {
+          const subSkus = listing.subSku.split(',').map(s => s.trim()).filter(s => s);
+          
+          if (subSkus.includes(updatedProduct.subSku)) {
+            // Update the subSkuData in this listing's attributes
+            const currentAttributes = listing.attributes || {};
+            const updatedSubSkuData = { ...currentAttributes.subSkuData };
+            
+            updatedSubSkuData[updatedProduct.subSku] = {
+              name: `${updatedProduct.attributes?.subCategory || 'Unknown'}-${updatedProduct.subSku}`,
+              brandRealPrice: parseFloat(updatedProduct.brandRealPrice),
+              mainImageUrl: updatedProduct.mainImageUrl,
+              galleryImages: updatedProduct.galleryImages || [],
+              // Sync ALL product fields
+              title: updatedProduct.title,
+              category: updatedProduct.category,
+              collectionName: updatedProduct.collectionName,
+              singleSetItem: updatedProduct.singleSetItem,
+              groupSku: updatedProduct.groupSku,
+              subSku: updatedProduct.subSku,
+              attributes: updatedProduct.attributes
+            };
+            
+            await prisma.listing.update({
+              where: { id: listing.id },
+              data: {
+                attributes: {
+                  ...currentAttributes,
+                  subSkuData: updatedSubSkuData
+                }
+              }
+            });
+            
+            console.log(`✅ Updated listing ${listing.id} subSkuData`);
+          }
+        }
+      }
+      
+      console.log('✅ Auto-update completed successfully');
+    } catch (error) {
+      console.error('❌ Error in auto-update:', error);
+      // Don't throw error - this shouldn't break the product update
     }
   }
 
