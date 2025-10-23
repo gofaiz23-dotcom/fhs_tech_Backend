@@ -1041,6 +1041,25 @@ class ListingController {
         shippingPrice, commissionPrice, profitMarginPrice, ecommerceMiscellaneous
       } = req.body;
 
+      // Handle file uploads for images
+      let finalMainImageUrl = mainImageUrl;
+      let finalGalleryImages = galleryImages;
+      
+      if (req.files) {
+        // Handle mainImageUrl file upload
+        if (req.files.mainImageUrl && req.files.mainImageUrl.length > 0) {
+          const mainImg = req.files.mainImageUrl[0];
+          finalMainImageUrl = `/uploads/images/${mainImg.filename}`;
+          console.log('📸 Main image uploaded:', finalMainImageUrl);
+        }
+        
+        // Handle galleryImages file upload
+        if (req.files.galleryImages && req.files.galleryImages.length > 0) {
+          finalGalleryImages = req.files.galleryImages.map(img => `/uploads/images/${img.filename}`);
+          console.log('🖼️ Gallery images uploaded:', finalGalleryImages.length, finalGalleryImages);
+        }
+      }
+
       // Check if listing exists
       const existingListing = await ListingModel.findById(listingId);
       if (!existingListing) {
@@ -1077,8 +1096,8 @@ class ListingController {
         singleSetItem,
         productCounts,
         attributes,
-        mainImageUrl,
-        galleryImages,
+        mainImageUrl: finalMainImageUrl,
+        galleryImages: finalGalleryImages,
         brandId,
         productId,
         // All price fields except brandPrice and ecommercePrice (calculated)

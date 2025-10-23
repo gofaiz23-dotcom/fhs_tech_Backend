@@ -15,7 +15,7 @@ router.get('/images/template', ListingController.getImageTemplate);   // 2. Get 
 router.get('/status', ListingController.getBulkStatus); // 3. Get bulk processing status (all background jobs for all listings)
 router.post('/', uploadFileAndImages, handleUploadError, ListingController.createListing); // 4. Create listings (single/multiple/CSV/Excel) + image files/URLs - Unlimited with background processing
 router.put('/images', uploadSingleHybrid, handleUploadError, ListingController.bulkUploadListingImages); // 5. Upload listing images - Excel/JSON with image URLs - Unlimited with background processing
-router.put('/:id', validateId, ListingController.updateListing);      // 6. Update listing
+router.put('/:id', uploadFileAndImages, handleUploadError, validateId, ListingController.updateListing);      // 6. Update listing (with file upload support)
 router.delete('/cancel/:jobId', ListingController.cancelJob); // 7. Cancel background job (user can cancel own, admin can cancel any)
 router.delete('/:id', validateId, ListingController.deleteListing);   // 8. Delete listing
 router.delete('/', requireAdmin, ListingController.deleteAllListings); // 9. Delete all listings (Admin only)
