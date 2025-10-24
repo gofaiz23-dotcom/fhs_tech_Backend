@@ -5,12 +5,12 @@ class ShippingCalculatorController {
   // GET /api/shipping-calculator - Get all shipping values (LTL and PARCEL)
   static async getAllShippingValues(req, res) {
     try {
-      const shippingValues = await ShippingCalculatorModel.getAllShippingValues();
+      const shippingData = await ShippingCalculatorModel.getAllShippingValues();
 
       res.json({
         message: 'Shipping values retrieved successfully',
         timestamp: new Date().toISOString(),
-        data: shippingValues
+        data: shippingData
       });
     } catch (error) {
       console.error('Get shipping values error:', error);

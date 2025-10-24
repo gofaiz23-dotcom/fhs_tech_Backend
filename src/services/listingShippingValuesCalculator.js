@@ -44,9 +44,9 @@ class ListingShippingValuesCalculator {
   static async determineShippingType(calculatedGith, calculatedWeight) {
     try {
       // Get current LTL and PARCEL values from settings
-      const shippingValues = await ShippingCalculatorModel.getAllShippingValues();
-      const ltlValues = shippingValues.LTL;
-      const parcelValues = shippingValues.PARCEL;
+      const shippingData = await ShippingCalculatorModel.getAllShippingValues();
+      const ltlValues = shippingData.LTL;
+      const parcelValues = shippingData.PARCEL;
 
       // Ensure all values are properly parsed as numbers with decimal support
       const calcGith = parseFloat(calculatedGith) || 0;

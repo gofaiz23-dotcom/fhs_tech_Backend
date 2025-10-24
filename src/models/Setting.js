@@ -12,7 +12,9 @@ class SettingModel {
           inventoryConfig: {
             minValue: 3
           },
-          ownBrand: {}
+          ownBrand: {},
+          LTLValues: { githValue: 166, weight: 151 },
+          PARCELValues: { githValue: 165, weight: 150 }
         }
       });
     }
@@ -83,7 +85,9 @@ class SettingModel {
         inventoryConfig: {
           minValue: 3
         },
-        ownBrand: {}
+        ownBrand: {},
+        LTLValues: { githValue: 166, weight: 151 },
+        PARCELValues: { githValue: 165, weight: 150 }
       }
     });
   }

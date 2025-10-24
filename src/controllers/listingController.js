@@ -102,7 +102,10 @@ class ListingController {
           data: {
             inventoryConfig: {
               minValue: 3
-            }
+            },
+            ownBrand: {},
+            LTLValues: { githValue: 166, weight: 151 },
+            PARCELValues: { githValue: 165, weight: 150 }
           }
         });
       }
