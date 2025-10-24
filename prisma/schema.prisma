@@ -292,6 +292,9 @@ model Setting {
   id              Int      @id @default(autoincrement())
   inventoryConfig Json     @default("{\"minValue\": 3}") @map("inventory_config") // JSONB: {minValue: 3}
   ownBrand        Json     @default("{}") @map("own_brand") // JSONB: {"Original Brand": "Custom Brand"}
+  shippingValues  Json?    @map("shipping_values") // JSONB: {githValue: 165, weight: 150} - DEPRECATED, use LTLValues and PARCELValues
+  LTLValues       Json     @default("{\"githValue\": 166, \"weight\": 151}") @map("ltl_values") // JSONB: {githValue: 166, weight: 151}
+  PARCELValues    Json     @default("{\"githValue\": 165, \"weight\": 150}") @map("parcel_values") // JSONB: {githValue: 165, weight: 150}
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 

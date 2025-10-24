@@ -4,6 +4,7 @@ import adminRoutes from './adminRoutes.js';
 import brandRoutes from './brandRoutes.js';
 import marketplaceRoutes from './marketplaceRoutes.js';
 import shippingRoutes from './shippingRoutes.js';
+import shippingCalculatorRoutes from './shippingCalculatorRoutes.js';
 import productRoutes from './productRoutes.js';
 import productPricingRoutes from './productPricingRoutes.js';
 import listingRoutes from './listingRoutes.js';
@@ -20,6 +21,7 @@ router.use('/admin', adminRoutes);
 router.use('/brands', brandRoutes);
 router.use('/marketplaces', marketplaceRoutes);
 router.use('/shipping', shippingRoutes);
+router.use('/shipping-calculator', shippingCalculatorRoutes);
 router.use('/products', productRoutes);
 router.use('/products/pricing', productPricingRoutes);
 router.use('/listings', listingRoutes);
@@ -86,6 +88,7 @@ router.get('/', (req, res) => {
       brands: '/api/brands',
       marketplaces: '/api/marketplaces',
       shipping: '/api/shipping',
+      shippingCalculator: '/api/shipping-calculator',
       products: '/api/products',
       listings: '/api/listings',
       settings: '/api/settings',

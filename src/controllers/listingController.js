@@ -4,6 +4,7 @@ import SettingModel from '../models/Setting.js';
 import { prisma } from '../config/database.js';
 import { processImage, processImages } from '../utils/imageDownloader.js';
 import jobTracker from '../services/jobTracker.js';
+import ListingShippingValuesCalculator from '../services/listingShippingValuesCalculator.js';
 import BackgroundProcessor from '../services/backgroundProcessor.js';
 
 class ListingController {
@@ -987,6 +988,22 @@ class ListingController {
             }
           }
 
+          // STEP 6.5: Set shipTypes as PENDING for background processing
+          let calculatedShipTypes = 'PENDING';
+          
+          // Check if we have shipping dimensions for background calculation
+          const attributes = finalAttributes;
+          const shippingWidth = attributes?.shippingWidth;
+          const shippingHeight = attributes?.shippingHeight;
+          const shippingLength = attributes?.shippingLength;
+          const weight = attributes?.weight;
+
+          if (shippingWidth && shippingHeight && shippingLength && weight) {
+            console.log(`🔄 New listing will be processed in background for shipTypes calculation`);
+          } else {
+            console.log(`⚠️ Missing shipping dimensions, shipTypes will remain PENDING`);
+          }
+
           const listing = await ListingModel.create({
             productId: product.id,  // Link to product (for validation only)
             brandId: brand.id,  // For access control and display
@@ -995,7 +1012,7 @@ class ListingController {
             subSku: listingData.subSku,
             category: listingData.category,
             collectionName: listingData.collectionName || '',
-            shipTypes: listingData.shipTypes,
+            shipTypes: calculatedShipTypes, // Set as PENDING for background processing
             singleSetItem: listingData.singleSetItem,
             brandRealPrice: brandRealPrice,
             brandMiscellaneous: brandMiscellaneous,
@@ -1011,6 +1028,24 @@ class ListingController {
             productCounts: listingData.productCounts || null,  // JSONB mapping subSku to quantity
             attributes: finalAttributes
           });
+
+          // STEP 6.6: Background processing for shipTypes calculation
+          if (shippingWidth && shippingHeight && shippingLength && weight) {
+            setImmediate(async () => {
+              try {
+                console.log(`🔄 Starting background shipTypes calculation for listing ${listing.id}...`);
+                const shippingResult = await ListingShippingValuesCalculator.processListing(listing.id);
+                
+                if (shippingResult?.updated) {
+                  console.log(`✅ Background shipTypes calculation completed for listing ${listing.id}: ${shippingResult.shippingType}`);
+                } else {
+                  console.log(`⚠️ Background calculation completed but no update for listing ${listing.id}`);
+                }
+              } catch (shippingError) {
+                console.error(`❌ Background shipTypes calculation failed for listing ${listing.id}:`, shippingError.message);
+              }
+            });
+          }
 
           // STEP 7: Auto-create inventory items from listing's subSku (check for existing first)
           let inventoryItems = [];
@@ -1217,6 +1252,28 @@ class ListingController {
         }
       }
 
+      // Set shipTypes as PENDING for background processing if attributes are being updated
+      let finalShipTypes = shipTypes || existingListing.shipTypes;
+      let needsBackgroundProcessing = false;
+      
+      if (attributes && (attributes.shippingWidth || attributes.shippingHeight || attributes.shippingLength || attributes.weight)) {
+        // Use updated attributes or existing ones
+        const finalAttributes = attributes || existingListing.attributes;
+        const shippingWidth = finalAttributes?.shippingWidth;
+        const shippingHeight = finalAttributes?.shippingHeight;
+        const shippingLength = finalAttributes?.shippingLength;
+        const weight = finalAttributes?.weight;
+
+        // Check if we have all required shipping dimensions
+        if (shippingWidth && shippingHeight && shippingLength && weight) {
+          finalShipTypes = 'PENDING';
+          needsBackgroundProcessing = true;
+          console.log(`🔄 Listing ${listingId} will be processed in background for shipTypes calculation`);
+        } else {
+          console.log(`⚠️ Missing shipping dimensions for update, keeping existing shipTypes: ${finalShipTypes}`);
+        }
+      }
+
       // Prepare update data object
       const updateData = {
         title,
@@ -1224,7 +1281,7 @@ class ListingController {
         subSku,
         category,
         collectionName,
-        shipTypes,
+        shipTypes: finalShipTypes, // Use pre-calculated shipTypes
         singleSetItem,
         attributes,
         mainImageUrl: finalMainImageUrl,
@@ -1256,6 +1313,24 @@ class ListingController {
         // Import ProductController for auto-update
         const ProductController = (await import('./productController.js')).default;
         await ProductController.autoUpdateSubSkuData(updatedListing);
+      }
+
+      // Background processing for shipTypes calculation if needed
+      if (needsBackgroundProcessing) {
+        setImmediate(async () => {
+          try {
+            console.log(`🔄 Starting background shipTypes calculation for listing update ${listingId}...`);
+            const shippingResult = await ListingShippingValuesCalculator.processListing(listingId);
+            
+            if (shippingResult?.updated) {
+              console.log(`✅ Background shipTypes calculation completed for listing ${listingId}: ${shippingResult.shippingType}`);
+            } else {
+              console.log(`⚠️ Background calculation completed but no update for listing ${listingId}`);
+            }
+          } catch (shippingError) {
+            console.error(`❌ Background shipTypes calculation failed for listing ${listingId}:`, shippingError.message);
+          }
+        });
       }
 
       res.json({
