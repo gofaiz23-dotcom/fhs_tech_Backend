@@ -338,27 +338,70 @@ class ListingController {
                         });
                     }
                     
+                    // Map complete single product data
                     cleanedListing.attributes.subSkuData[subSku] = {
-                      name: `${relatedProduct.attributes?.subCategory || 'Product'}-${subSku}`,
+                      id: relatedProduct.id,
+                      title: relatedProduct.title,
+                      groupSku: relatedProduct.groupSku,
+                      subSku: relatedProduct.subSku,
+                      category: relatedProduct.category,
+                      collectionName: relatedProduct.collectionName,
+                      singleSetItem: relatedProduct.singleSetItem,
+                      brandId: relatedProduct.brandId,
                       brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
-                      mainImageUrl: processedMainImageUrl, // ← Processed with base URL
-                      galleryImages: processedGalleryImages // ← Processed with base URL
+                      brandMiscellaneous: parseFloat(relatedProduct.brandMiscellaneous),
+                      brandPrice: parseFloat(relatedProduct.brandPrice),
+                      msrp: parseFloat(relatedProduct.msrp),
+                      shippingPrice: parseFloat(relatedProduct.shippingPrice),
+                      commissionPrice: parseFloat(relatedProduct.commissionPrice),
+                      profitMarginPrice: parseFloat(relatedProduct.profitMarginPrice),
+                      ecommerceMiscellaneous: parseFloat(relatedProduct.ecommerceMiscellaneous),
+                      ecommercePrice: parseFloat(relatedProduct.ecommercePrice),
+                      mainImageUrl: processedMainImageUrl,
+                      galleryImages: processedGalleryImages,
+                      attributes: relatedProduct.attributes,
+                      createdAt: relatedProduct.createdAt,
+                      updatedAt: relatedProduct.updatedAt
                     };
                   } else {
-                    // If individual product not found, create basic entry
+                    // If individual product not found, create basic entry with available data
                     cleanedListing.attributes.subSkuData[subSku] = {
-                      name: `Product-${subSku}`,
+                      subSku: subSku,
+                      category: cleanedListing.category,
+                      collectionName: cleanedListing.collectionName,
+                      singleSetItem: cleanedListing.singleSetItem,
+                      brandId: cleanedListing.brandId,
                       brandRealPrice: parseFloat(cleanedListing.brandRealPrice),
+                      brandMiscellaneous: parseFloat(cleanedListing.brandMiscellaneous),
+                      brandPrice: parseFloat(cleanedListing.brandPrice),
+                      msrp: parseFloat(cleanedListing.msrp),
+                      shippingPrice: parseFloat(cleanedListing.shippingPrice),
+                      commissionPrice: parseFloat(cleanedListing.commissionPrice),
+                      profitMarginPrice: parseFloat(cleanedListing.profitMarginPrice),
+                      ecommerceMiscellaneous: parseFloat(cleanedListing.ecommerceMiscellaneous),
+                      ecommercePrice: parseFloat(cleanedListing.ecommercePrice),
                       mainImageUrl: cleanedListing.mainImageUrl,
                       galleryImages: cleanedListing.galleryImages || []
                     };
                   }
                 } catch (error) {
                   console.error(`Error fetching product for subSku ${subSku}:`, error);
-                  // Create basic entry on error
+                  // Create basic entry on error with available data
                   cleanedListing.attributes.subSkuData[subSku] = {
-                    name: `Product-${subSku}`,
+                    subSku: subSku,
+                    category: cleanedListing.category,
+                    collectionName: cleanedListing.collectionName,
+                    singleSetItem: cleanedListing.singleSetItem,
+                    brandId: cleanedListing.brandId,
                     brandRealPrice: parseFloat(cleanedListing.brandRealPrice),
+                    brandMiscellaneous: parseFloat(cleanedListing.brandMiscellaneous),
+                    brandPrice: parseFloat(cleanedListing.brandPrice),
+                    msrp: parseFloat(cleanedListing.msrp),
+                    shippingPrice: parseFloat(cleanedListing.shippingPrice),
+                    commissionPrice: parseFloat(cleanedListing.commissionPrice),
+                    profitMarginPrice: parseFloat(cleanedListing.profitMarginPrice),
+                    ecommerceMiscellaneous: parseFloat(cleanedListing.ecommerceMiscellaneous),
+                    ecommercePrice: parseFloat(cleanedListing.ecommercePrice),
                     mainImageUrl: cleanedListing.mainImageUrl,
                     galleryImages: cleanedListing.galleryImages || []
                   };
@@ -834,27 +877,70 @@ class ListingController {
                         });
                     }
                     
+                    // Map complete single product data
                     finalAttributes.subSkuData[subSku] = {
-                      name: `${relatedProduct.attributes?.subCategory || 'Product'}-${subSku}`,
+                      id: relatedProduct.id,
+                      title: relatedProduct.title,
+                      groupSku: relatedProduct.groupSku,
+                      subSku: relatedProduct.subSku,
+                      category: relatedProduct.category,
+                      collectionName: relatedProduct.collectionName,
+                      singleSetItem: relatedProduct.singleSetItem,
+                      brandId: relatedProduct.brandId,
                       brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
-                      mainImageUrl: relativeMainImageUrl, // ← Relative URL for storage
-                      galleryImages: relativeGalleryImages // ← Relative URLs for storage
+                      brandMiscellaneous: parseFloat(relatedProduct.brandMiscellaneous),
+                      brandPrice: parseFloat(relatedProduct.brandPrice),
+                      msrp: parseFloat(relatedProduct.msrp),
+                      shippingPrice: parseFloat(relatedProduct.shippingPrice),
+                      commissionPrice: parseFloat(relatedProduct.commissionPrice),
+                      profitMarginPrice: parseFloat(relatedProduct.profitMarginPrice),
+                      ecommerceMiscellaneous: parseFloat(relatedProduct.ecommerceMiscellaneous),
+                      ecommercePrice: parseFloat(relatedProduct.ecommercePrice),
+                      mainImageUrl: relativeMainImageUrl,
+                      galleryImages: relativeGalleryImages,
+                      attributes: relatedProduct.attributes,
+                      createdAt: relatedProduct.createdAt,
+                      updatedAt: relatedProduct.updatedAt
                     };
                   } else {
-                    // If individual product not found, create basic entry
+                    // If individual product not found, create basic entry with available data
                     finalAttributes.subSkuData[subSku] = {
-                      name: `Product-${subSku}`,
+                      subSku: subSku,
+                      category: listingData.category,
+                      collectionName: listingData.collectionName,
+                      singleSetItem: listingData.singleSetItem,
+                      brandId: listingData.brandId,
                       brandRealPrice: parseFloat(listingData.brandRealPrice),
+                      brandMiscellaneous: parseFloat(listingData.brandMiscellaneous),
+                      brandPrice: parseFloat(listingData.brandPrice),
+                      msrp: parseFloat(listingData.msrp),
+                      shippingPrice: parseFloat(listingData.shippingPrice),
+                      commissionPrice: parseFloat(listingData.commissionPrice),
+                      profitMarginPrice: parseFloat(listingData.profitMarginPrice),
+                      ecommerceMiscellaneous: parseFloat(listingData.ecommerceMiscellaneous),
+                      ecommercePrice: parseFloat(listingData.ecommercePrice),
                       mainImageUrl: listingData.mainImageUrl || null,
                       galleryImages: listingData.galleryImages || []
                     };
                   }
                 } catch (error) {
                   console.error(`Error fetching product for subSku ${subSku}:`, error);
-                  // Create basic entry on error
+                  // Create basic entry on error with available data
                   finalAttributes.subSkuData[subSku] = {
-                    name: `Product-${subSku}`,
+                    subSku: subSku,
+                    category: listingData.category,
+                    collectionName: listingData.collectionName,
+                    singleSetItem: listingData.singleSetItem,
+                    brandId: listingData.brandId,
                     brandRealPrice: parseFloat(listingData.brandRealPrice),
+                    brandMiscellaneous: parseFloat(listingData.brandMiscellaneous),
+                    brandPrice: parseFloat(listingData.brandPrice),
+                    msrp: parseFloat(listingData.msrp),
+                    shippingPrice: parseFloat(listingData.shippingPrice),
+                    commissionPrice: parseFloat(listingData.commissionPrice),
+                    profitMarginPrice: parseFloat(listingData.profitMarginPrice),
+                    ecommerceMiscellaneous: parseFloat(listingData.ecommerceMiscellaneous),
+                    ecommercePrice: parseFloat(listingData.ecommercePrice),
                     mainImageUrl: listingData.mainImageUrl || null,
                     galleryImages: listingData.galleryImages || []
                   };

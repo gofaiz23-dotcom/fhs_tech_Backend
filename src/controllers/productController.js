@@ -214,11 +214,30 @@ class ProductController {
                         });
                     }
                     
+                    // Map complete single product data
                     cleanedProduct.attributes.subSkuData[subSku] = {
-                      name: `${relatedProduct.attributes?.subCategory || 'Product'}-${subSku}`,
+                      id: relatedProduct.id,
+                      title: relatedProduct.title,
+                      groupSku: relatedProduct.groupSku,
+                      subSku: relatedProduct.subSku,
+                      category: relatedProduct.category,
+                      collectionName: relatedProduct.collectionName,
+                      singleSetItem: relatedProduct.singleSetItem,
+                      brandId: relatedProduct.brandId,
                       brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
-                      mainImageUrl: processedMainImageUrl, // ← Processed with base URL
-                      galleryImages: processedGalleryImages // ← Processed with base URL
+                      brandMiscellaneous: parseFloat(relatedProduct.brandMiscellaneous),
+                      brandPrice: parseFloat(relatedProduct.brandPrice),
+                      msrp: parseFloat(relatedProduct.msrp),
+                      shippingPrice: parseFloat(relatedProduct.shippingPrice),
+                      commissionPrice: parseFloat(relatedProduct.commissionPrice),
+                      profitMarginPrice: parseFloat(relatedProduct.profitMarginPrice),
+                      ecommerceMiscellaneous: parseFloat(relatedProduct.ecommerceMiscellaneous),
+                      ecommercePrice: parseFloat(relatedProduct.ecommercePrice),
+                      mainImageUrl: processedMainImageUrl,
+                      galleryImages: processedGalleryImages,
+                      attributes: relatedProduct.attributes,
+                      createdAt: relatedProduct.createdAt,
+                      updatedAt: relatedProduct.updatedAt
                     };
                   }
                 }
@@ -259,11 +278,30 @@ class ProductController {
                       });
                   }
                   
+                  // Map complete single product data
                   cleanedProduct.attributes.subSkuData[subSku] = {
-                    name: `${relatedProduct.attributes?.subCategory || 'Product'}-${subSku}`,
+                    id: relatedProduct.id,
+                    title: relatedProduct.title,
+                    groupSku: relatedProduct.groupSku,
+                    subSku: relatedProduct.subSku,
+                    category: relatedProduct.category,
+                    collectionName: relatedProduct.collectionName,
+                    singleSetItem: relatedProduct.singleSetItem,
+                    brandId: relatedProduct.brandId,
                     brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
-                    mainImageUrl: processedMainImageUrl, // ← Processed with base URL
-                    galleryImages: processedGalleryImages // ← Processed with base URL
+                    brandMiscellaneous: parseFloat(relatedProduct.brandMiscellaneous),
+                    brandPrice: parseFloat(relatedProduct.brandPrice),
+                    msrp: parseFloat(relatedProduct.msrp),
+                    shippingPrice: parseFloat(relatedProduct.shippingPrice),
+                    commissionPrice: parseFloat(relatedProduct.commissionPrice),
+                    profitMarginPrice: parseFloat(relatedProduct.profitMarginPrice),
+                    ecommerceMiscellaneous: parseFloat(relatedProduct.ecommerceMiscellaneous),
+                    ecommercePrice: parseFloat(relatedProduct.ecommercePrice),
+                    mainImageUrl: processedMainImageUrl,
+                    galleryImages: processedGalleryImages,
+                    attributes: relatedProduct.attributes,
+                    createdAt: relatedProduct.createdAt,
+                    updatedAt: relatedProduct.updatedAt
                   };
                 }
               }
@@ -650,11 +688,30 @@ class ProductController {
                     });
                 }
                 
+                // Map complete single product data
                 finalAttributes.subSkuData[subSku] = {
-                  name: `${relatedProduct.attributes?.subCategory || 'Product'}-${subSku}`,
+                  id: relatedProduct.id,
+                  title: relatedProduct.title,
+                  groupSku: relatedProduct.groupSku,
+                  subSku: relatedProduct.subSku,
+                  category: relatedProduct.category,
+                  collectionName: relatedProduct.collectionName,
+                  singleSetItem: relatedProduct.singleSetItem,
+                  brandId: relatedProduct.brandId,
                   brandRealPrice: parseFloat(relatedProduct.brandRealPrice),
-                  mainImageUrl: relativeMainImageUrl, // ← Relative URL for storage
-                  galleryImages: relativeGalleryImages // ← Relative URLs for storage
+                  brandMiscellaneous: parseFloat(relatedProduct.brandMiscellaneous),
+                  brandPrice: parseFloat(relatedProduct.brandPrice),
+                  msrp: parseFloat(relatedProduct.msrp),
+                  shippingPrice: parseFloat(relatedProduct.shippingPrice),
+                  commissionPrice: parseFloat(relatedProduct.commissionPrice),
+                  profitMarginPrice: parseFloat(relatedProduct.profitMarginPrice),
+                  ecommerceMiscellaneous: parseFloat(relatedProduct.ecommerceMiscellaneous),
+                  ecommercePrice: parseFloat(relatedProduct.ecommercePrice),
+                  mainImageUrl: relativeMainImageUrl,
+                  galleryImages: relativeGalleryImages,
+                  attributes: relatedProduct.attributes,
+                  createdAt: relatedProduct.createdAt,
+                  updatedAt: relatedProduct.updatedAt
                 };
               }
               
@@ -2312,11 +2369,30 @@ class ProductController {
               });
           }
           
+          // Map complete single product data
           product.attributes.subSkuData[subSku] = {
-            name: `${updatedSingleProduct.attributes?.subCategory || 'Product'}-${subSku}`,
+            id: updatedSingleProduct.id,
+            title: updatedSingleProduct.title,
+            groupSku: updatedSingleProduct.groupSku,
+            subSku: updatedSingleProduct.subSku,
+            category: updatedSingleProduct.category,
+            collectionName: updatedSingleProduct.collectionName,
+            singleSetItem: updatedSingleProduct.singleSetItem,
+            brandId: updatedSingleProduct.brandId,
             brandRealPrice: parseFloat(updatedSingleProduct.brandRealPrice),
-            mainImageUrl: relativeMainImageUrl, // Relative URL
-            galleryImages: relativeGalleryImages // Relative URLs
+            brandMiscellaneous: parseFloat(updatedSingleProduct.brandMiscellaneous),
+            brandPrice: parseFloat(updatedSingleProduct.brandPrice),
+            msrp: parseFloat(updatedSingleProduct.msrp),
+            shippingPrice: parseFloat(updatedSingleProduct.shippingPrice),
+            commissionPrice: parseFloat(updatedSingleProduct.commissionPrice),
+            profitMarginPrice: parseFloat(updatedSingleProduct.profitMarginPrice),
+            ecommerceMiscellaneous: parseFloat(updatedSingleProduct.ecommerceMiscellaneous),
+            ecommercePrice: parseFloat(updatedSingleProduct.ecommercePrice),
+            mainImageUrl: relativeMainImageUrl,
+            galleryImages: relativeGalleryImages,
+            attributes: updatedSingleProduct.attributes,
+            createdAt: updatedSingleProduct.createdAt,
+            updatedAt: updatedSingleProduct.updatedAt
           };
           
           // Save to database
@@ -2350,11 +2426,30 @@ class ProductController {
               });
           }
           
+          // Map complete single product data
           listing.attributes.subSkuData[subSku] = {
-            name: `${updatedSingleProduct.attributes?.subCategory || 'Product'}-${subSku}`,
+            id: updatedSingleProduct.id,
+            title: updatedSingleProduct.title,
+            groupSku: updatedSingleProduct.groupSku,
+            subSku: updatedSingleProduct.subSku,
+            category: updatedSingleProduct.category,
+            collectionName: updatedSingleProduct.collectionName,
+            singleSetItem: updatedSingleProduct.singleSetItem,
+            brandId: updatedSingleProduct.brandId,
             brandRealPrice: parseFloat(updatedSingleProduct.brandRealPrice),
-            mainImageUrl: relativeMainImageUrl, // Relative URL
-            galleryImages: relativeGalleryImages // Relative URLs
+            brandMiscellaneous: parseFloat(updatedSingleProduct.brandMiscellaneous),
+            brandPrice: parseFloat(updatedSingleProduct.brandPrice),
+            msrp: parseFloat(updatedSingleProduct.msrp),
+            shippingPrice: parseFloat(updatedSingleProduct.shippingPrice),
+            commissionPrice: parseFloat(updatedSingleProduct.commissionPrice),
+            profitMarginPrice: parseFloat(updatedSingleProduct.profitMarginPrice),
+            ecommerceMiscellaneous: parseFloat(updatedSingleProduct.ecommerceMiscellaneous),
+            ecommercePrice: parseFloat(updatedSingleProduct.ecommercePrice),
+            mainImageUrl: relativeMainImageUrl,
+            galleryImages: relativeGalleryImages,
+            attributes: updatedSingleProduct.attributes,
+            createdAt: updatedSingleProduct.createdAt,
+            updatedAt: updatedSingleProduct.updatedAt
           };
           
           // Save to database
