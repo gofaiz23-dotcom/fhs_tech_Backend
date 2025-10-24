@@ -1135,7 +1135,7 @@ class ListingController {
       const { 
         title, sku, groupSku, subSku, category, collectionName, shipTypes, 
         singleSetItem, productCounts, attributes, mainImageUrl, galleryImages, 
-        brandId, productId,
+        brandId, brandName, productId,
         // All price fields except brandPrice and ecommercePrice (calculated)
         brandRealPrice, brandMiscellaneous, msrp,
         shippingPrice, commissionPrice, profitMarginPrice, ecommerceMiscellaneous
@@ -1183,6 +1183,22 @@ class ListingController {
         });
       }
 
+      // Handle brandId/brandName - find brand by ID or name
+      let finalBrandId = existingListing.brandId; // Default to existing brand
+      
+      if (brandId || brandName) {
+        const brand = await ListingModel.checkBrandExists(brandId || brandName);
+        if (brand) {
+          finalBrandId = brand.id;
+          console.log('✅ Brand found:', { id: brand.id, name: brand.name });
+        } else {
+          return res.status(400).json({
+            error: 'Brand not found',
+            message: `Brand with identifier "${brandId || brandName}" does not exist`
+          });
+        }
+      }
+
       // Check user access to listing's brand (for non-admin users)
       if (req.user.role !== 'ADMIN') {
         const hasAccess = await prisma.userBrandAccess.findFirst({
@@ -1228,8 +1244,10 @@ class ListingController {
         updateData.productCounts = productCounts;
       }
 
-      // Note: brandId updates are not allowed for listings as they are tied to products
-      // The brandId should remain the same as the original listing's brandId
+      // Only update brandId if it's provided and different
+      if (brandId || brandName) {
+        updateData.brandId = finalBrandId;
+      }
 
       const updatedListing = await ListingModel.update(listingId, updateData);
 

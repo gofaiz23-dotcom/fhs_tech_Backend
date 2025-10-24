@@ -876,7 +876,7 @@ class ProductController {
       const productId = parseInt(req.params.id);
       const { 
         title, groupSku, subSku, category, collectionName, singleSetItem, 
-        attributes, mainImageUrl, galleryImages, brandId,
+        attributes, mainImageUrl, galleryImages, brandId, brandName,
         // All price fields except brandPrice and ecommercePrice (calculated)
         brandRealPrice, brandMiscellaneous, msrp,
         shippingPrice, commissionPrice, profitMarginPrice, ecommerceMiscellaneous
@@ -924,6 +924,48 @@ class ProductController {
         });
       }
 
+      // Handle brandId/brandName - find brand by ID or name
+      let finalBrandId = existingProduct.brandId; // Default to existing brand
+      
+      if (brandId || brandName) {
+        const brand = await ProductModel.checkBrandExists(brandId || brandName);
+        if (brand) {
+          finalBrandId = brand.id;
+          console.log('✅ Brand found:', { id: brand.id, name: brand.name });
+        } else {
+          return res.status(400).json({
+            error: 'Brand not found',
+            message: `Brand with identifier "${brandId || brandName}" does not exist`
+          });
+        }
+      }
+      
+      // Only include brandId in update if it's different from existing
+      const updateData = {
+        title,
+        groupSku,
+        subSku,
+        category,
+        collectionName,
+        singleSetItem,
+        attributes,
+        mainImageUrl: finalMainImageUrl,
+        galleryImages: finalGalleryImages,
+        // All price fields except brandPrice and ecommercePrice (calculated)
+        brandRealPrice: parseFloat(brandRealPrice) || 0,
+        brandMiscellaneous: parseFloat(brandMiscellaneous) || 0,
+        msrp: parseFloat(msrp) || 0,
+        shippingPrice: parseFloat(shippingPrice) || 0,
+        commissionPrice: parseFloat(commissionPrice) || 0,
+        profitMarginPrice: parseFloat(profitMarginPrice) || 0,
+        ecommerceMiscellaneous: parseFloat(ecommerceMiscellaneous) || 0
+      };
+      
+      // Only update brandId if it's provided and different
+      if (brandId || brandName) {
+        updateData.brandId = finalBrandId;
+      }
+
       // Check user access to product's brand (for non-admin users)
       if (req.user.role !== 'ADMIN') {
         const hasAccess = await prisma.userBrandAccess.findFirst({
@@ -942,26 +984,7 @@ class ProductController {
         }
       }
 
-      const updatedProduct = await ProductModel.update(productId, {
-        title,
-        groupSku,
-        subSku,
-        category,
-        collectionName,
-        singleSetItem,
-        attributes,
-        mainImageUrl: finalMainImageUrl,
-        galleryImages: finalGalleryImages,
-        brandId: parseInt(brandId),
-        // All price fields except brandPrice and ecommercePrice (calculated)
-        brandRealPrice: parseFloat(brandRealPrice) || 0,
-        brandMiscellaneous: parseFloat(brandMiscellaneous) || 0,
-        msrp: parseFloat(msrp) || 0,
-        shippingPrice: parseFloat(shippingPrice) || 0,
-        commissionPrice: parseFloat(commissionPrice) || 0,
-        profitMarginPrice: parseFloat(profitMarginPrice) || 0,
-        ecommerceMiscellaneous: parseFloat(ecommerceMiscellaneous) || 0
-      });
+      const updatedProduct = await ProductModel.update(productId, updateData);
 
       // Auto-update related multi-subSKU products and listings if this is a single subSKU product
       if (updatedProduct.subSku && !updatedProduct.subSku.includes(',')) {
