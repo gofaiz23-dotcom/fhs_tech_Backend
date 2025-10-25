@@ -191,8 +191,8 @@ class ProductController {
                     where: { subSku: subSku }
                   });
                   
-                  // Only add to subSkuData if the individual product exists
-                  if (relatedProduct) {
+                  // Only add to subSkuData if the individual product exists and is a single subSKU product
+                  if (relatedProduct && relatedProduct.subSku && !relatedProduct.subSku.includes(',')) {
                     // Process main image URL with base URL
                     let processedMainImageUrl = relatedProduct.mainImageUrl;
                     if (processedMainImageUrl && processedMainImageUrl.startsWith('/uploads/')) {
@@ -255,8 +255,8 @@ class ProductController {
                   where: { subSku: subSku }
                 });
                 
-                // Only add to subSkuData if the individual product exists
-                if (relatedProduct) {
+                // Only add to subSkuData if the individual product exists and is a single subSKU product
+                if (relatedProduct && relatedProduct.subSku && !relatedProduct.subSku.includes(',')) {
                   // Process main image URL with base URL
                   let processedMainImageUrl = relatedProduct.mainImageUrl;
                   if (processedMainImageUrl && processedMainImageUrl.startsWith('/uploads/')) {
@@ -635,11 +635,15 @@ class ProductController {
               const existingSubSkus = [];
               
               for (const subSku of subSkus) {
+                // Find products with exact subSku match (no comma-separated values)
                 const relatedProduct = await prisma.product.findFirst({
-                  where: { subSku: subSku }
+                  where: { 
+                    subSku: subSku
+                  }
                 });
                 
-                if (relatedProduct) {
+                // Additional check: ensure it's a single subSKU product (not comma-separated)
+                if (relatedProduct && relatedProduct.subSku && !relatedProduct.subSku.includes(',')) {
                   existingSubSkus.push(subSku);
                 } else {
                   missingSubSkus.push(subSku);
@@ -663,9 +667,18 @@ class ProductController {
               finalAttributes.subSkuData = {};
               
               for (const subSku of subSkus) {
+                // Find products with exact subSku match (no comma-separated values)
                 const relatedProduct = await prisma.product.findFirst({
-                  where: { subSku: subSku }
+                  where: { 
+                    subSku: subSku
+                  }
                 });
+                
+                // Skip if product doesn't exist or is not a single subSKU product
+                if (!relatedProduct || !relatedProduct.subSku || relatedProduct.subSku.includes(',')) {
+                  console.warn(`⚠️ Skipping subSku ${subSku} - not found or is multi-subSKU product`);
+                  continue;
+                }
                 
                 // Store relative URLs (no base URL) in database
                 let relativeMainImageUrl = relatedProduct.mainImageUrl;
@@ -2354,20 +2367,26 @@ class ProductController {
       const subSku = updatedSingleProduct.subSku;
       console.log(`🔄 Auto-updating subSkuData for subSKU: ${subSku}`);
       
-      // Find all products that have this subSKU in their subSku list
-      const relatedProducts = await prisma.product.findMany({
+      // Find all products that contain this subSKU (we'll filter multi-subSKU products next)
+      const allRelatedProducts = await prisma.product.findMany({
         where: {
           subSku: { contains: subSku },
           id: { not: updatedSingleProduct.id }
         }
       });
       
-      // Find all listings that have this subSKU in their subSku list  
-      const relatedListings = await prisma.listing.findMany({
+      // Filter to only multi-subSKU products (those with comma-separated values)
+      const relatedProducts = allRelatedProducts.filter(p => p.subSku && p.subSku.includes(','));
+      
+      // Find all listings that contain this subSKU (we'll filter multi-subSKU listings next)
+      const allRelatedListings = await prisma.listing.findMany({
         where: {
           subSku: { contains: subSku }
         }
       });
+      
+      // Filter to only multi-subSKU listings (those with comma-separated values)
+      const relatedListings = allRelatedListings.filter(l => l.subSku && l.subSku.includes(','));
       
       console.log(`📦 Found ${relatedProducts.length} related products and ${relatedListings.length} related listings`);
       

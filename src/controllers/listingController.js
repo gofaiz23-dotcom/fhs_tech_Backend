@@ -320,7 +320,8 @@ class ListingController {
                     where: { subSku: subSku }
                   });
                   
-                  if (relatedProduct) {
+                  // Only process if product exists and is a single subSKU product
+                  if (relatedProduct && relatedProduct.subSku && !relatedProduct.subSku.includes(',')) {
                     // Process main image URL with base URL
                     let processedMainImageUrl = relatedProduct.mainImageUrl;
                     if (processedMainImageUrl && processedMainImageUrl.startsWith('/uploads/')) {
@@ -645,12 +646,7 @@ class ListingController {
             for (const subSku of listingSubSkus) {
               const individualProduct = await prisma.product.findFirst({
                 where: { 
-                  subSku: subSku,
-                  // Ensure it's a single subSKU product (no comma)
-                  subSku: { 
-                    equals: subSku,
-                    not: { contains: ',' }
-                  }
+                  subSku: subSku
                 },
                 include: {
                   brand: {
@@ -662,7 +658,8 @@ class ListingController {
                 }
               });
               
-              if (individualProduct) {
+              // Additional check: ensure it's a single subSKU product (not comma-separated)
+              if (individualProduct && individualProduct.subSku && !individualProduct.subSku.includes(',')) {
                 existingSubSkus.push(subSku);
                 // Use the first found product as the main product for the listing
                 if (!product) {
@@ -854,12 +851,15 @@ class ListingController {
               
               for (const subSku of subSkus) {
                 try {
-                  // Get individual subSKU data from related products
+                  // Get individual subSKU data from related products (exact match only)
                   const relatedProduct = await prisma.product.findFirst({
-                    where: { subSku: subSku }
+                    where: { 
+                      subSku: subSku
+                    }
                   });
                   
-                  if (relatedProduct) {
+                  // Additional check: ensure it's a single subSKU product (not comma-separated)
+                  if (relatedProduct && relatedProduct.subSku && !relatedProduct.subSku.includes(',')) {
                     // Store relative URLs (no base URL) in database
                     let relativeMainImageUrl = relatedProduct.mainImageUrl;
                     if (relativeMainImageUrl && relativeMainImageUrl.startsWith('/uploads/')) {
