@@ -1,7 +1,9 @@
 import ProductModel from '../models/Product.js';
 import jobTracker from '../services/jobTracker.js';
+import BackgroundProcessor from '../services/backgroundProcessor.js';
 import { prisma } from '../config/database.js';
 import { processImage, processImages } from '../utils/imageDownloader.js';
+import TimeEstimator from '../utils/timeEstimator.js';
 
 class ProductController {
   // Helper method to normalize field names (case-insensitive)
@@ -834,9 +836,24 @@ class ProductController {
 
 
         } catch (error) {
+          // Convert technical errors to user-friendly messages
+          let userFriendlyError = error.message;
+          
+          if (error.message.includes('Unique constraint failed') && error.message.includes('group_sku')) {
+            userFriendlyError = `Product with group SKU "${productData.groupSku}" already exists`;
+          } else if (error.message.includes('Unique constraint failed')) {
+            userFriendlyError = 'Duplicate entry - product already exists';
+          } else if (error.message.includes('foreign key constraint')) {
+            userFriendlyError = 'Related data not found';
+          } else if (error.message.includes('required field')) {
+            userFriendlyError = 'Missing required information';
+          } else if (error.message.includes('Invalid')) {
+            userFriendlyError = 'Invalid data provided';
+          }
+          
           results.errors.push({
             title: productData.title,
-            error: error.message
+            error: userFriendlyError
           });
         }
       }
@@ -1175,14 +1192,8 @@ class ProductController {
         });
       }
 
-      // For small datasets (< 100), process immediately
-      if (imageData.length < 100) {
-        console.log('📦 Small dataset detected, processing immediately...');
-        return ProductController.processImageDataSync(req, res, imageData);
-      }
-
-      // For large datasets, use background processing
-      console.log('🚀 Large dataset detected, using background processing...');
+      // Industry standard: Always use background processing for ALL operations
+      console.log(`🚀 Processing ${imageData.length} image(s) in background...`);
       
       const jobId = await BackgroundProcessor.processBulk(
         req.user.userId,
@@ -1968,17 +1979,24 @@ class ProductController {
       let productsToCreate = [];
       let fileInfo = null;
 
-      // Check if file was uploaded
-      if (req.file) {
+      // Check if file was uploaded (note: uploadFileAndImages uses .fields() so files are in req.files)
+      const uploadedFile = req.files && req.files.file ? req.files.file[0] : req.file;
+      
+      if (uploadedFile) {
         console.log('📁 Bulk File Upload Detected:', {
-          filename: req.file.originalname,
-          size: req.file.size,
-          mimetype: req.file.mimetype
+          filename: uploadedFile.originalname,
+          size: uploadedFile.size,
+          mimetype: uploadedFile.mimetype,
+          path: uploadedFile.path
         });
 
-        // Process file upload from memory buffer
+        // Process file upload from disk
         const FileProcessor = (await import('../utils/fileProcessor.js')).default;
-        const fileData = await FileProcessor.processFileBuffer(req.file.buffer, req.file.originalname);
+        const fs = await import('fs');
+        
+        // Read file from disk path
+        const fileBuffer = fs.readFileSync(uploadedFile.path);
+        const fileData = await FileProcessor.processFileBuffer(fileBuffer, uploadedFile.originalname);
         
         if (fileData.length === 0) {
           return res.status(400).json({
@@ -1998,10 +2016,10 @@ class ProductController {
 
         productsToCreate = validData;
         fileInfo = {
-          originalName: req.file.originalname,
-          storedName: req.file.filename,
-          size: req.file.size,
-          mimetype: req.file.mimetype
+          originalName: uploadedFile.originalname,
+          storedName: uploadedFile.filename,
+          size: uploadedFile.size,
+          mimetype: uploadedFile.mimetype
         };
       } else {
         // Handle JSON data (single product, multiple products, or products array)
@@ -2028,12 +2046,10 @@ class ProductController {
         }
       }
 
-      // For small datasets (< 1000), process immediately
-      if (productsToCreate.length < 1000) {
-        return ProductController.createProduct(req, res);
-      }
-
-      // For large datasets, use background processing
+      // Industry standard: Always use background processing for ALL operations
+      // This ensures consistent behavior, progress tracking, and non-blocking UI
+      console.log(`🚀 Processing ${productsToCreate.length} product(s) in background...`);
+      
       const jobId = await BackgroundProcessor.processCustom(
         req.user.userId,
         'PRODUCT_CREATE',
@@ -2104,11 +2120,26 @@ class ProductController {
               });
 
             } catch (error) {
+              // Convert technical errors to user-friendly messages
+              let userFriendlyError = error.message;
+              
+              if (error.message.includes('Unique constraint failed') && error.message.includes('group_sku')) {
+                userFriendlyError = `Product with group SKU "${productData.groupSku}" already exists`;
+              } else if (error.message.includes('Unique constraint failed')) {
+                userFriendlyError = 'Duplicate entry - product already exists';
+              } else if (error.message.includes('foreign key constraint')) {
+                userFriendlyError = 'Related data not found';
+              } else if (error.message.includes('required field')) {
+                userFriendlyError = 'Missing required information';
+              } else if (error.message.includes('Invalid')) {
+                userFriendlyError = 'Invalid data provided';
+              }
+              
               tracker.updateProgress(jobId, {
                 processed: i + 1,
                 failed: (tracker.getJob(jobId).data.failed || 0) + 1,
                 errors: [...(tracker.getJob(jobId).data.errors || []), 
-                  { item: productData.title, error: error.message }
+                  { item: productData.title || productData.groupSku, error: userFriendlyError }
                 ].slice(-20)
               });
             }
@@ -2117,11 +2148,11 @@ class ProductController {
       );
 
       res.status(202).json({
-        message: `Large dataset detected (${productsToCreate.length} products). Processing in background.`,
+        message: `${productsToCreate.length} product(s) processing in background.`,
         jobId: jobId,
         status: 'PROCESSING',
         totalProducts: productsToCreate.length,
-        estimatedTime: `${Math.ceil(productsToCreate.length / 100)} minutes`,
+        estimatedTime: TimeEstimator.estimateProducts(productsToCreate.length),
         checkStatus: `/api/products/status?jobId=${jobId}`,
         timestamp: new Date().toISOString()
       });
@@ -2161,21 +2192,24 @@ class ProductController {
         return res.json({
           message: 'Job status retrieved successfully',
           job: {
-            jobId: job.jobId,
-            userId: job.userId,
-            type: job.type,
-            status: job.status,
-            progress: `${job.progress}%`,
+            id: job.jobId, // Frontend expects 'id'
+            jobId: job.jobId, // Keep for backward compatibility
+            userId: job.userId?.toString(), // Convert to string for frontend comparison
+            type: job.type?.toLowerCase() || 'product',
+            status: job.status?.toLowerCase() || 'pending',
+            progress: job.progress || 0, // Frontend expects number
+            totalItems: job.data.total || 0, // Frontend expects 'totalItems'
+            processedItems: job.data.processed || 0, // Frontend expects 'processedItems'
             total: job.data.total,
             processed: job.data.processed,
             success: job.data.success,
             failed: job.data.failed,
             errors: job.data.errors || [],
-            startedAt: job.startedAt,
-            completedAt: job.completedAt,
+            startedAt: job.startedAt instanceof Date ? job.startedAt.toISOString() : job.startedAt,
+            completedAt: job.completedAt instanceof Date ? job.completedAt.toISOString() : job.completedAt,
             duration: job.completedAt 
-              ? `${Math.round((job.completedAt - job.startedAt) / 1000)}s`
-              : `${Math.round((Date.now() - job.startedAt) / 1000)}s`
+              ? `${Math.round((new Date(job.completedAt) - new Date(job.startedAt)) / 1000)}s`
+              : `${Math.round((Date.now() - new Date(job.startedAt)) / 1000)}s`
           },
           timestamp: new Date().toISOString()
         });
@@ -2186,25 +2220,29 @@ class ProductController {
         ? jobTracker.getJobsByType(null, 'PRODUCT')  // Admin: all jobs
         : jobTracker.getJobsByType(req.user.userId, 'PRODUCT'); // User: only their jobs
       
-      // Format jobs for response
+      // Format jobs for response (frontend expects specific format)
       const formattedJobs = productJobs.map(job => ({
-        jobId: job.jobId,
-        ...(req.user.role === 'ADMIN' && { userId: job.userId }), // Show userId for admin
-        type: job.type,
-        status: job.status,
-        progress: `${job.progress}%`,
+        id: job.jobId, // Frontend expects 'id' not 'jobId'
+        jobId: job.jobId, // Keep for backward compatibility
+        userId: job.userId?.toString(), // Convert to string for frontend comparison
+        ...(req.user.role === 'ADMIN' && { username: `User ${job.userId}` }), // Show username for admin
+        type: job.type?.toLowerCase() || 'product', // Ensure lowercase for frontend
+        status: job.status?.toLowerCase() || 'pending', // Ensure lowercase
+        progress: job.progress || 0, // Frontend expects number, not string
+        totalItems: job.data.total || 0, // Frontend expects 'totalItems'
+        processedItems: job.data.processed || 0, // Frontend expects 'processedItems'
         summary: {
           total: job.data.total,
           processed: job.data.processed,
           success: job.data.success,
           failed: job.data.failed
         },
-        recentErrors: (job.data.errors || []).slice(0, 3), // Show 3 recent errors
-        startedAt: job.startedAt,
-        completedAt: job.completedAt,
+        recentErrors: job.data.errors || [], // Show all errors
+        startedAt: job.startedAt instanceof Date ? job.startedAt.toISOString() : job.startedAt,
+        completedAt: job.completedAt instanceof Date ? job.completedAt.toISOString() : job.completedAt,
         duration: job.completedAt 
-          ? `${Math.round((job.completedAt - job.startedAt) / 1000)}s`
-          : `${Math.round((Date.now() - job.startedAt) / 1000)}s`
+          ? `${Math.round((new Date(job.completedAt) - new Date(job.startedAt)) / 1000)}s`
+          : `${Math.round((Date.now() - new Date(job.startedAt)) / 1000)}s`
       }));
 
       // Get statistics if admin

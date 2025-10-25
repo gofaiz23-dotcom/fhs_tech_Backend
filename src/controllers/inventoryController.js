@@ -375,21 +375,24 @@ class InventoryController {
         return res.json({
           message: 'Job status retrieved successfully',
           job: {
-            jobId: job.jobId,
-            userId: job.userId,
-            type: job.type,
-            status: job.status,
-            progress: `${job.progress}%`,
+            id: job.jobId, // Frontend expects 'id'
+            jobId: job.jobId, // Keep for backward compatibility
+            userId: job.userId?.toString(), // Convert to string for frontend comparison
+            type: job.type?.toLowerCase() || 'inventory',
+            status: job.status?.toLowerCase() || 'pending',
+            progress: job.progress || 0, // Frontend expects number
+            totalItems: job.data.total || 0, // Frontend expects 'totalItems'
+            processedItems: job.data.processed || 0, // Frontend expects 'processedItems'
             total: job.data.total,
             processed: job.data.processed,
             success: job.data.success,
             failed: job.data.failed,
             errors: job.data.errors || [],
-            startedAt: job.startedAt,
-            completedAt: job.completedAt,
+            startedAt: job.startedAt instanceof Date ? job.startedAt.toISOString() : job.startedAt,
+            completedAt: job.completedAt instanceof Date ? job.completedAt.toISOString() : job.completedAt,
             duration: job.completedAt 
-              ? `${Math.round((job.completedAt - job.startedAt) / 1000)}s`
-              : `${Math.round((Date.now() - job.startedAt) / 1000)}s`
+              ? `${Math.round((new Date(job.completedAt) - new Date(job.startedAt)) / 1000)}s`
+              : `${Math.round((Date.now() - new Date(job.startedAt)) / 1000)}s`
           },
           timestamp: new Date().toISOString()
         });
@@ -400,25 +403,29 @@ class InventoryController {
         ? jobTracker.getJobsByType(null, 'INVENTORY')  // Admin: all jobs
         : jobTracker.getJobsByType(req.user.userId, 'INVENTORY'); // User: only their jobs
       
-      // Format jobs for response
+      // Format jobs for response (frontend expects specific format)
       const formattedJobs = inventoryJobs.map(job => ({
-        jobId: job.jobId,
-        ...(req.user.role === 'ADMIN' && { userId: job.userId }), // Show userId for admin
-        type: job.type,
-        status: job.status,
-        progress: `${job.progress}%`,
+        id: job.jobId, // Frontend expects 'id' not 'jobId'
+        jobId: job.jobId, // Keep for backward compatibility
+        userId: job.userId?.toString(), // Convert to string for frontend comparison
+        ...(req.user.role === 'ADMIN' && { username: `User ${job.userId}` }), // Show username for admin
+        type: job.type?.toLowerCase() || 'inventory', // Ensure lowercase for frontend
+        status: job.status?.toLowerCase() || 'pending', // Ensure lowercase
+        progress: job.progress || 0, // Frontend expects number, not string
+        totalItems: job.data.total || 0, // Frontend expects 'totalItems'
+        processedItems: job.data.processed || 0, // Frontend expects 'processedItems'
         summary: {
           total: job.data.total,
           processed: job.data.processed,
           success: job.data.success,
           failed: job.data.failed
         },
-        recentErrors: (job.data.errors || []).slice(0, 3), // Show 3 recent errors
-        startedAt: job.startedAt,
-        completedAt: job.completedAt,
+        recentErrors: job.data.errors || [], // Show all errors
+        startedAt: job.startedAt instanceof Date ? job.startedAt.toISOString() : job.startedAt,
+        completedAt: job.completedAt instanceof Date ? job.completedAt.toISOString() : job.completedAt,
         duration: job.completedAt 
-          ? `${Math.round((job.completedAt - job.startedAt) / 1000)}s`
-          : `${Math.round((Date.now() - job.startedAt) / 1000)}s`
+          ? `${Math.round((new Date(job.completedAt) - new Date(job.startedAt)) / 1000)}s`
+          : `${Math.round((Date.now() - new Date(job.startedAt)) / 1000)}s`
       }));
 
       // Get statistics if admin

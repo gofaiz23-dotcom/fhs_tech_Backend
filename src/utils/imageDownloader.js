@@ -29,12 +29,14 @@ async function downloadImage(imageUrl) {
     const filename = `downloaded_${uuidv4()}_${Date.now()}${ext}`;
     const filepath = path.join(downloadDir, filename);
 
-    // Download image
+    // Download image with timeout and retry logic
     const response = await axios({
       method: 'get',
       url: imageUrl,
       responseType: 'stream',
       timeout: 30000, // 30 second timeout
+      maxRedirects: 5,
+      validateStatus: (status) => status >= 200 && status < 400,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
@@ -45,18 +47,41 @@ async function downloadImage(imageUrl) {
     response.data.pipe(writer);
 
     return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        writer.destroy();
+        reject(new Error('Image download timeout - server took too long to respond'));
+      }, 30000);
+
       writer.on('finish', () => {
+        clearTimeout(timeout);
         const localPath = `/uploads/downloadedUrlimages/${filename}`;
         console.log(`✅ Downloaded image: ${imageUrl} → ${localPath}`);
         resolve(localPath);
       });
-      writer.on('error', reject);
+      writer.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
     });
 
   } catch (error) {
-    console.error(`❌ Failed to download image: ${imageUrl}`, error.message);
-    // Return original URL if download fails
-    return imageUrl;
+    // Provide user-friendly error messages
+    let errorMessage = 'Image download failed';
+    
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      errorMessage = 'Image download timeout - URL may be slow or unreachable';
+    } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      errorMessage = 'Cannot reach image server - check internet connection';
+    } else if (error.response && error.response.status === 404) {
+      errorMessage = 'Image not found at the provided URL';
+    } else if (error.response && error.response.status >= 500) {
+      errorMessage = 'Image server error - please try again later';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    console.error(`❌ Failed to download image: ${imageUrl}`, errorMessage);
+    throw new Error(errorMessage);
   }
 }
 

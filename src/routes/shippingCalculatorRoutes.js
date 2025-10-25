@@ -1,6 +1,11 @@
 import express from 'express';
 import ShippingCalculatorController from '../controllers/shippingCalculatorController.js';
+import { authenticateToken } from '../middlewares/auth.js';
+
 const router = express.Router();
+
+// All shipping calculator routes require authentication
+router.use(authenticateToken);
 
 // GET /api/shipping-calculator - Get all shipping values (LTL and PARCEL)
 router.get('/', ShippingCalculatorController.getAllShippingValues);
